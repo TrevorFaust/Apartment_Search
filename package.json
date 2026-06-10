@@ -1,0 +1,12 @@
+{
+  "name": "apartment-hunt",
+  "private": true,
+  "workspaces": [
+    "scraper",
+    "web"
+  ],
+  "scripts": {
+    "scrape": "npm run scrape --workspace scraper",
+    "dev": "npm run dev --workspace web"
+  }
+}

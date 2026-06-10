@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #faf7f1;
+  --color-paper-deep: #f1ecdf;
+  --color-ink: #211d16;
+  --color-ink-soft: #6b6353;
+  --color-ink-faint: #a89e8c;
+  --color-line: #e3dccc;
+  --color-rust: #b8441f;
+  --color-rust-deep: #933516;
+  --color-moss: #4a5d3a;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-franklin), "Helvetica Neue", sans-serif;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  background-image: radial-gradient(var(--color-line) 0.5px, transparent 0.5px);
+  background-size: 24px 24px;
+}
+
+::selection {
+  background: var(--color-rust);
+  color: var(--color-paper);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.45s ease-out both;
+}
