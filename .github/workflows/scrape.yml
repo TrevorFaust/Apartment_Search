@@ -1,10 +1,10 @@
 name: Daily apartment scrape
 
 on:
+  workflow_dispatch:
   schedule:
     # 15:00 UTC = 7am PST / 8am PDT
     - cron: "0 15 * * *"
-  workflow_dispatch: {}
 
 jobs:
   scrape:
