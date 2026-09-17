@@ -1,5 +1,5 @@
 import type { BrowserContext } from "playwright";
-import type { Preferences, ScrapedListing } from "../types.js";
+import type { Preferences, ScrapedListing, SearchLocation } from "../types.js";
 
 /**
  * Apartments.com has no public API; this is a gentle once-a-day Playwright
@@ -12,8 +12,9 @@ import type { Preferences, ScrapedListing } from "../types.js";
 export async function scrapeApartmentsCom(
   context: BrowserContext,
   prefs: Preferences,
+  location: SearchLocation,
 ): Promise<ScrapedListing[]> {
-  const citySlug = `${prefs.city.toLowerCase().replace(/\s+/g, "-")}-wa`;
+  const citySlug = `${location.city.toLowerCase().replace(/\s+/g, "-")}-${location.state.toLowerCase()}`;
   const url = `https://www.apartments.com/${citySlug}/${buildFilterSegment(prefs)}`;
 
   const page = await context.newPage();
@@ -116,7 +117,10 @@ export async function scrapeApartmentsCom(
           sqft: null,
           neighborhood: null,
           address: i.address || null,
-          city: prefs.city,
+          city: location.city,
+          state: location.state,
+          latitude: null,
+          longitude: null,
           imageUrl: i.imageUrl,
           amenities: i.amenities,
           postedAt: null,

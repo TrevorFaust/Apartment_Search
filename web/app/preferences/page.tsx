@@ -1,5 +1,12 @@
-import { supabaseAdmin, type PreferencesRow } from "@/lib/supabase";
+import { supabaseAdmin, normalizeLocations, type PreferencesRow } from "@/lib/supabase";
 import { savePreferences } from "../actions";
+import { LocationsEditor } from "../locations-editor";
+import { MultiSelectFilter } from "../multi-select-filter";
+import {
+  applyListingFilters,
+  fetchDistinctNeighborhoods,
+  parseFilters,
+} from "@/lib/listings-query";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +25,36 @@ export default async function PreferencesPage() {
     );
   }
   const prefs = data as PreferencesRow;
+  const locations = normalizeLocations(prefs);
+  const cities = locations.map((l) => l.city);
+
+  let neighborhoodOptions: Awaited<
+    ReturnType<typeof fetchDistinctNeighborhoods>
+  > = [];
+  try {
+    const buildFacetQuery = () =>
+      applyListingFilters(
+        supabaseAdmin().from("listings"),
+        parseFilters({ city: cities }),
+        { includeCityFilter: true, includeNeighborhoodFilter: false, select: "id" },
+      );
+    neighborhoodOptions = await fetchDistinctNeighborhoods(
+      buildFacetQuery,
+      cities,
+    );
+  } catch (err) {
+    console.error("Failed to load neighborhood options:", err);
+    neighborhoodOptions = [];
+  }
+
+  const selectedNeighborhoods = prefs.neighborhoods.map((value) => {
+    if (value.includes(":")) return value;
+    const match = neighborhoodOptions.find(
+      (option) =>
+        option.value === value || option.value.endsWith(`:${value}`),
+    );
+    return match?.value ?? value;
+  });
 
   return (
     <div className="rise mx-auto max-w-2xl">
@@ -25,8 +62,8 @@ export default async function PreferencesPage() {
         Search <span className="italic font-normal text-rust">preferences</span>
       </h2>
       <p className="mt-1 mb-8 text-sm text-ink-soft">
-        These drive both the scraper&apos;s search filters and which new
-        listings make it into your daily newsletter.
+        These drive the scraper&apos;s search areas, radius filter, and which
+        new listings make it into your daily newsletter.
       </p>
 
       <form
@@ -34,20 +71,45 @@ export default async function PreferencesPage() {
         className="space-y-6 border border-line bg-paper p-6 shadow-[4px_4px_0_0_var(--color-line)]"
       >
         <Section title="Where">
-          <div className="grid grid-cols-2 gap-4">
-            <Field
-              label="City"
-              name="city"
-              defaultValue={prefs.city}
-              hint="e.g. seattle (used for Craigslist subdomain + Apartments.com URL)"
-            />
-            <Field
-              label="Neighborhoods"
-              name="neighborhoods"
-              defaultValue={prefs.neighborhoods.join(", ")}
-              hint="comma-separated, blank = anywhere"
-            />
-          </div>
+          <LocationsEditor initialLocations={locations} />
+        </Section>
+
+        <Section title="Radius">
+          <Field
+            label="Radius (miles)"
+            name="radius_miles"
+            type="number"
+            step="1"
+            defaultValue={prefs.radius_miles ?? ""}
+            hint="Distance from downtown of each search city. Blank = no limit. Re-save after changing cities."
+          />
+          {prefs.radius_miles != null &&
+            locations.some((l) => l.center_lat != null && l.center_lng != null) && (
+              <ul className="mt-2 space-y-1 text-[10px] text-ink-faint">
+                {locations
+                  .filter((l) => l.center_lat != null && l.center_lng != null)
+                  .map((l) => (
+                    <li key={`${l.city}-${l.state}`}>
+                      {titleCaseCity(l.city)}, {l.state.toUpperCase()} center:{" "}
+                      {l.center_lat!.toFixed(4)}, {l.center_lng!.toFixed(4)}
+                    </li>
+                  ))}
+              </ul>
+            )}
+        </Section>
+
+        <Section title="Neighborhoods (newsletter)">
+          <MultiSelectFilter
+            name="neighborhoods"
+            label="Include only these neighborhoods"
+            options={neighborhoodOptions}
+            selected={selectedNeighborhoods}
+            emptyLabel="Any neighborhood"
+          />
+          <p className="mt-2 text-[10px] normal-case tracking-normal text-ink-faint">
+            Options come from scraped listings in your configured cities. Blank
+            selection = anywhere.
+          </p>
         </Section>
 
         <Section title="Budget & size">
@@ -90,6 +152,17 @@ export default async function PreferencesPage() {
       </form>
     </div>
   );
+}
+
+function titleCaseCity(city: string): string {
+  return city
+    .split(/([\s-]+)/)
+    .map((part) =>
+      /^[\s-]+$/.test(part)
+        ? part
+        : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase(),
+    )
+    .join("");
 }
 
 function Section({

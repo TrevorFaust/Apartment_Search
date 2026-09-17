@@ -6,14 +6,19 @@ function requireEnv(name: string): string {
   return value;
 }
 
-// Server-only client using the service role key. Never import this from a
-// client component.
 export function supabaseAdmin() {
   return createClient(
     requireEnv("SUPABASE_URL"),
     requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
     { auth: { persistSession: false } },
   );
+}
+
+export interface SearchLocation {
+  city: string;
+  state: string;
+  center_lat?: number | null;
+  center_lng?: number | null;
 }
 
 export interface ListingRow {
@@ -29,6 +34,9 @@ export interface ListingRow {
   neighborhood: string | null;
   address: string | null;
   city: string;
+  state: string | null;
+  latitude: number | null;
+  longitude: number | null;
   image_url: string | null;
   amenities: string[];
   posted_at: string | null;
@@ -42,6 +50,7 @@ export interface ListingRow {
 export interface PreferencesRow {
   key: string;
   city: string;
+  locations: SearchLocation[];
   min_price: number | null;
   max_price: number | null;
   min_beds: number | null;
@@ -51,4 +60,20 @@ export interface PreferencesRow {
   neighborhoods: string[];
   keywords: string[];
   email_to: string | null;
+  radius_miles: number | null;
+  radius_center: string | null;
+  radius_center_lat: number | null;
+  radius_center_lng: number | null;
+}
+
+export function normalizeLocations(prefs: PreferencesRow): SearchLocation[] {
+  if (prefs.locations?.length) {
+    return prefs.locations.map((l) => ({
+      city: l.city.toLowerCase().trim(),
+      state: l.state.toLowerCase().trim(),
+      center_lat: l.center_lat ?? null,
+      center_lng: l.center_lng ?? null,
+    }));
+  }
+  return [{ city: prefs.city.toLowerCase().trim(), state: "wa" }];
 }

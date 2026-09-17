@@ -1,6 +1,19 @@
 import Link from "next/link";
-import { supabaseAdmin, type ListingRow } from "@/lib/supabase";
+import { supabaseAdmin, type ListingRow, type SearchLocation } from "@/lib/supabase";
 import { ListingCard } from "./listing-card";
+import { CityMultiSelect, NeighborhoodMultiSelect } from "./filter-multi-selects";
+import {
+  applyListingFilters,
+  buildFilterQueryString,
+  buildRadiusCenters,
+  fetchDistinctCities,
+  fetchDistinctNeighborhoods,
+  distinctNeighborhoodOptionsFromListings,
+  filterByRadius,
+  PAGE_SIZE,
+  parseFilters,
+  parsePage,
+} from "@/lib/listings-query";
 
 export const dynamic = "force-dynamic";
 
@@ -19,52 +32,150 @@ export default async function ListingsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const tab = typeof params.tab === "string" ? params.tab : "all";
-  const str = (k: string) => (typeof params[k] === "string" ? (params[k] as string) : "");
+  const filters = parseFilters(params);
+  const page = parsePage(filters.page);
 
-  let query = supabaseAdmin()
-    .from("listings")
-    .select("*")
-    .order("first_seen_at", { ascending: false })
-    .limit(200);
+  // Preferences only supply geocoded city centers for optional radius — not browse filters.
+  const { data: prefsData } = await supabaseAdmin()
+    .from("preferences")
+    .select("locations")
+    .eq("key", "default")
+    .single();
 
-  if (tab === "hidden") {
-    query = query.eq("is_hidden", true);
-  } else {
-    query = query.eq("is_hidden", false);
-    if (tab === "new") {
-      query = query.gte(
-        "first_seen_at",
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+  const prefLocations: SearchLocation[] = (prefsData?.locations ?? []).map(
+    (l: SearchLocation) => ({
+      city: l.city.toLowerCase(),
+      state: l.state.toLowerCase(),
+      center_lat: l.center_lat ?? null,
+      center_lng: l.center_lng ?? null,
+    }),
+  );
+
+  const searchLocations = buildRadiusCenters(filters.cities, prefLocations);
+
+  const buildFacetQuery = () =>
+    applyListingFilters(supabaseAdmin().from("listings"), filters, {
+      includeNeighborhoodFilter: false,
+      includeCityFilter: false,
+      select: "id",
+    });
+
+  const facetsPromise = (async () => {
+    try {
+      const [neighborhoodOptions, cityOptions] = await Promise.all([
+        fetchDistinctNeighborhoods(buildFacetQuery, filters.cities),
+        fetchDistinctCities(buildFacetQuery),
+      ]);
+      return { neighborhoodOptions, cityOptions };
+    } catch (err) {
+      console.error("Failed to load filter facets:", err);
+      return {
+        neighborhoodOptions: [] as Awaited<
+          ReturnType<typeof fetchDistinctNeighborhoods>
+        >,
+        cityOptions: [] as string[],
+      };
+    }
+  })();
+
+  const radiusActive =
+    filters.radiusMiles && Number.isFinite(Number(filters.radiusMiles));
+  const hasRadius =
+    radiusActive &&
+    searchLocations.some((l) => l.center_lat != null && l.center_lng != null);
+
+  let listings: ListingRow[] = [];
+  let totalCount = 0;
+
+  if (hasRadius) {
+    const { data, error } = await applyListingFilters(
+      supabaseAdmin().from("listings").select("*"),
+      filters,
+    )
+      .order("first_seen_at", { ascending: false })
+      .limit(10000);
+
+    if (error) {
+      return (
+        <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
+          Couldn&apos;t load listings: {error.message}
+        </p>
       );
     }
-    if (tab === "favorites") query = query.eq("is_favorite", true);
+
+    const allFiltered = filterByRadius(
+      (data ?? []) as ListingRow[],
+      filters.radiusMiles,
+      searchLocations,
+    );
+    totalCount = allFiltered.length;
+    const offset = (page - 1) * PAGE_SIZE;
+    listings = allFiltered.slice(offset, offset + PAGE_SIZE);
+  } else {
+    const { count, error: countError } = await applyListingFilters(
+      supabaseAdmin()
+        .from("listings")
+        .select("id", { count: "exact", head: true }),
+      filters,
+    );
+
+    if (countError) {
+      return (
+        <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
+          Couldn&apos;t load listings: {countError.message}
+        </p>
+      );
+    }
+
+    totalCount = count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+    const safePage = Math.min(page, totalPages);
+    const offset = (safePage - 1) * PAGE_SIZE;
+
+    const { data, error } = await applyListingFilters(
+      supabaseAdmin().from("listings").select("*"),
+      filters,
+    )
+      .order("first_seen_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error) {
+      return (
+        <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
+          Couldn&apos;t load listings: {error.message}
+        </p>
+      );
+    }
+
+    listings = (data ?? []) as ListingRow[];
   }
 
-  if (str("min_price")) query = query.gte("price", Number(str("min_price")));
-  if (str("max_price")) query = query.lte("price", Number(str("max_price")));
-  if (str("beds")) query = query.gte("bedrooms", Number(str("beds")));
-  if (str("neighborhood"))
-    query = query.ilike("neighborhood", `%${str("neighborhood")}%`);
-  if (str("source")) query = query.eq("source", str("source"));
+  let { neighborhoodOptions, cityOptions } = await facetsPromise;
 
-  const { data, error } = await query;
-  if (error) {
-    return (
-      <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
-        Couldn&apos;t load listings: {error.message}
-      </p>
+  if (neighborhoodOptions.length === 0 && listings.length > 0) {
+    neighborhoodOptions = distinctNeighborhoodOptionsFromListings(
+      listings,
+      filters.cities,
     );
   }
-  const listings = (data ?? []) as ListingRow[];
+  if (cityOptions.length === 0 && listings.length > 0) {
+    cityOptions = [...new Set(listings.map((l) => l.city).filter(Boolean))].sort(
+      (a, b) => a.localeCompare(b),
+    );
+  }
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const showingFrom = totalCount === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const showingTo = Math.min(safePage * PAGE_SIZE, totalCount);
 
   const tabHref = (id: string) => {
-    const next = new URLSearchParams();
-    for (const k of ["min_price", "max_price", "beds", "neighborhood", "source"]) {
-      if (str(k)) next.set(k, str(k));
-    }
-    if (id !== "all") next.set("tab", id);
-    const qs = next.toString();
+    const qs = buildFilterQueryString(filters, { tab: id, page: "1" });
+    return qs ? `/?${qs}` : "/";
+  };
+
+  const pageHref = (p: number) => {
+    const qs = buildFilterQueryString(filters, { page: String(p) });
     return qs ? `/?${qs}` : "/";
   };
 
@@ -76,7 +187,7 @@ export default async function ListingsPage({
             key={t.id}
             href={tabHref(t.id)}
             className={`px-4 py-1.5 text-sm transition-colors ${
-              tab === t.id
+              filters.tab === t.id
                 ? "bg-ink text-paper"
                 : "border border-ink/20 hover:border-ink/60"
             }`}
@@ -85,40 +196,94 @@ export default async function ListingsPage({
           </Link>
         ))}
         <span className="ml-auto font-display text-sm italic text-ink-soft">
-          {listings.length} listing{listings.length === 1 ? "" : "s"}
+          {totalCount === 0
+            ? "0 listings"
+            : `Showing ${showingFrom}–${showingTo} of ${totalCount}`}
         </span>
       </div>
 
-      <form className="mb-8 grid grid-cols-2 gap-3 border border-line bg-paper-deep/60 p-4 sm:grid-cols-3 lg:grid-cols-6">
-        {tab !== "all" && <input type="hidden" name="tab" value={tab} />}
-        <Field label="Min $" name="min_price" defaultValue={str("min_price")} type="number" />
-        <Field label="Max $" name="max_price" defaultValue={str("max_price")} type="number" />
-        <Field label="Beds ≥" name="beds" defaultValue={str("beds")} type="number" />
-        <Field label="Neighborhood" name="neighborhood" defaultValue={str("neighborhood")} />
+      <form className="mb-8 grid grid-cols-2 gap-3 border border-line bg-paper-deep/60 p-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        {filters.tab !== "all" && (
+          <input type="hidden" name="tab" value={filters.tab} />
+        )}
+        <Field
+          label="Min $"
+          name="min_price"
+          defaultValue={filters.minPrice}
+          type="number"
+        />
+        <Field
+          label="Max $"
+          name="max_price"
+          defaultValue={filters.maxPrice}
+          type="number"
+        />
+        <Field
+          label="Beds ≥"
+          name="beds"
+          defaultValue={filters.beds}
+          type="number"
+        />
+        <Field
+          label="Sqft ≥"
+          name="min_sqft"
+          defaultValue={filters.minSqft}
+          type="number"
+        />
+        <CityMultiSelect options={cityOptions} selected={filters.cities} />
+        <NeighborhoodMultiSelect
+          options={neighborhoodOptions}
+          selected={filters.neighborhoods}
+        />
+        <Field
+          label="Radius (mi)"
+          name="radius_miles"
+          defaultValue={filters.radiusMiles}
+          type="number"
+          hint="optional — pick a city first; uses downtown centers from Preferences"
+        />
         <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
           Source
           <select
             suppressHydrationWarning
             name="source"
-            defaultValue={str("source")}
+            defaultValue={filters.source}
             className="border border-ink/30 bg-paper px-2 py-1.5 text-sm text-ink focus:border-rust focus:outline-none"
           >
             <option value="">All</option>
             <option value="craigslist">Craigslist</option>
             <option value="apartments_com">Apartments.com</option>
             <option value="seattle_rentals">SeattleRentals</option>
+            <option value="chicago_rentals">ChicagoRentals</option>
+            <option value="chicago_apartment_finders">ChicagoApartmentFinders</option>
+            <option value="urban_abodes">UrbanAbodes</option>
+            <option value="domu">Domu</option>
           </select>
         </label>
         <button
           suppressHydrationWarning
           type="submit"
-          className="self-end border border-ink bg-ink px-4 py-1.5 text-sm text-paper transition-colors hover:bg-rust hover:border-rust"
+          className="self-end border border-ink bg-ink px-4 py-1.5 text-sm text-paper transition-colors hover:bg-rust hover:border-rust xl:col-span-1"
         >
           Filter
         </button>
       </form>
 
-      {listings.length === 0 ? (
+      {radiusActive && !hasRadius && (
+        <p className="mb-4 border border-dashed border-ink/30 p-3 text-xs text-ink-soft">
+          Radius needs at least one city selected, with a geocoded downtown center.
+          Save Preferences to geocode city centers, then pick that city here.
+        </p>
+      )}
+
+      {hasRadius && listings.length === 0 && totalCount === 0 && (
+        <p className="mb-4 border border-dashed border-ink/30 p-3 text-xs text-ink-soft">
+          No listings within {filters.radiusMiles} mi. Listings may lack
+          coordinates yet — run <code>npm run scrape</code> to geocode them.
+        </p>
+      )}
+
+      {totalCount === 0 ? (
         <div className="border border-dashed border-ink/30 p-16 text-center">
           <p className="font-display text-2xl italic text-ink-soft">
             Nothing here yet.
@@ -129,11 +294,50 @@ export default async function ListingsPage({
           </p>
         </div>
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.map((l, i) => (
-            <ListingCard key={l.id} listing={l} index={i} />
-          ))}
-        </div>
+        <>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {listings.map((l, i) => (
+              <ListingCard key={l.id} listing={l} index={i} />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <nav
+              className="mt-8 flex flex-wrap items-center justify-center gap-2 border-t border-line pt-6"
+              aria-label="Pagination"
+            >
+              {safePage > 1 ? (
+                <Link
+                  href={pageHref(safePage - 1)}
+                  className="border border-ink/25 px-4 py-1.5 text-sm transition-colors hover:border-ink hover:bg-paper-deep"
+                >
+                  ← Prev
+                </Link>
+              ) : (
+                <span className="border border-ink/10 px-4 py-1.5 text-sm text-ink-faint">
+                  ← Prev
+                </span>
+              )}
+
+              <span className="px-3 text-sm text-ink-soft">
+                Page {safePage} of {totalPages}
+              </span>
+
+              {safePage < totalPages ? (
+                <Link
+                  href={pageHref(safePage + 1)}
+                  className="border border-ink/25 px-4 py-1.5 text-sm transition-colors hover:border-ink hover:bg-paper-deep"
+                >
+                  Next →
+                </Link>
+              ) : (
+                <span className="border border-ink/10 px-4 py-1.5 text-sm text-ink-faint">
+                  Next →
+                </span>
+              )}
+            </nav>
+          )}
+        </>
       )}
     </div>
   );
@@ -144,11 +348,13 @@ function Field({
   name,
   defaultValue,
   type = "text",
+  hint,
 }: {
   label: string;
   name: string;
   defaultValue: string;
   type?: string;
+  hint?: string;
 }) {
   return (
     <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
@@ -160,6 +366,11 @@ function Field({
         defaultValue={defaultValue}
         className="border border-ink/30 bg-paper px-2 py-1.5 text-sm text-ink focus:border-rust focus:outline-none"
       />
+      {hint && (
+        <span className="text-[10px] normal-case tracking-normal text-ink-faint">
+          {hint}
+        </span>
+      )}
     </label>
   );
 }

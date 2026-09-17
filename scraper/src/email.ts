@@ -5,6 +5,10 @@ const SOURCE_LABELS: Record<string, string> = {
   craigslist: "Craigslist",
   apartments_com: "Apartments.com",
   seattle_rentals: "SeattleRentals",
+  chicago_rentals: "ChicagoRentals",
+  chicago_apartment_finders: "ChicagoApartmentFinders",
+  urban_abodes: "UrbanAbodes",
+  domu: "Domu",
 };
 
 const MAX_LISTINGS_IN_EMAIL = 50;
@@ -47,12 +51,12 @@ export async function sendNewsletter(
     ${sections}
     ${overflow > 0 ? `<p style="font-size:13px;color:#8a8378;">…and ${overflow} more in the web app.</p>` : ""}
     <p style="font-size:11px;color:#b5aea2;margin-top:32px;border-top:1px solid #e8e4dc;padding-top:12px;">
-      Sent by your Apartment Hunt scraper. Sources: Craigslist, Apartments.com, SeattleRentals.
+      Sent by Lease Locator. Sources: Craigslist, Apartments.com, SeattleRentals.
     </p>
   </div>`;
 
   const { error } = await resend.emails.send({
-    from: "Apartment Hunt <onboarding@resend.dev>",
+    from: "Lease Locator <onboarding@resend.dev>",
     to,
     subject: `🏠 ${listings.length} new apartment${listings.length === 1 ? "" : "s"} — ${date}`,
     html,

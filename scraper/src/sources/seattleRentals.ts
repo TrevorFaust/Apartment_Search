@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import type { Preferences, ScrapedListing } from "../types.js";
+import type { Preferences, ScrapedListing, SearchLocation } from "../types.js";
 
 const BASE = "https://www.seattlerentals.com";
 const PAGE_SIZE = 10;
@@ -12,6 +12,7 @@ const MAX_PAGES = 15;
  */
 export async function scrapeSeattleRentals(
   prefs: Preferences,
+  location: SearchLocation,
 ): Promise<ScrapedListing[]> {
   const listings: ScrapedListing[] = [];
 
@@ -68,7 +69,10 @@ export async function scrapeSeattleRentals(
         sqft: null,
         neighborhood,
         address,
-        city: prefs.city,
+        city: location.city,
+        state: location.state,
+        latitude: null,
+        longitude: null,
         imageUrl: row.find("img.resultsMainPic").attr("src") ?? null,
         amenities: [],
         postedAt: null,

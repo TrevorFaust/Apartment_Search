@@ -1,5 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Preferences, ScrapedListing } from "./types.js";
+import { normalizeLocations } from "./types.js";
+import {
+  buildListingGeocodeQuery,
+  geocodeAddress,
+  GEOCODE_BUDGET_PER_RUN,
+} from "./geocode.js";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -20,7 +26,50 @@ export async function loadPreferences(): Promise<Preferences> {
     .eq("key", "default")
     .single();
   if (error) throw new Error(`Failed to load preferences: ${error.message}`);
-  return data as Preferences;
+  const prefs = data as Preferences;
+  prefs.locations = normalizeLocations(prefs);
+  return prefs;
+}
+
+async function enrichWithCoordinates(
+  listings: ScrapedListing[],
+): Promise<ScrapedListing[]> {
+  let budget = GEOCODE_BUDGET_PER_RUN;
+  const out: ScrapedListing[] = [];
+
+  for (const listing of listings) {
+    if (listing.latitude != null && listing.longitude != null) {
+      out.push(listing);
+      continue;
+    }
+
+    if (budget <= 0) {
+      out.push(listing);
+      continue;
+    }
+
+    const query = buildListingGeocodeQuery({
+      address: listing.address,
+      neighborhood: listing.neighborhood,
+      city: listing.city,
+      state: listing.state,
+    });
+
+    if (!query) {
+      out.push(listing);
+      continue;
+    }
+
+    const coords = await geocodeAddress(query);
+    budget--;
+    out.push(
+      coords
+        ? { ...listing, latitude: coords.lat, longitude: coords.lng }
+        : listing,
+    );
+  }
+
+  return out;
 }
 
 /**
@@ -31,43 +80,60 @@ export async function loadPreferences(): Promise<Preferences> {
 export async function storeListings(
   listings: ScrapedListing[],
 ): Promise<ScrapedListing[]> {
-  // Sources can repeat a listing on the same page (e.g. featured + organic);
-  // Postgres rejects upserting the same key twice in one statement.
   const byKey = new Map<string, ScrapedListing>();
   for (const l of listings) byKey.set(`${l.source}:${l.externalId}`, l);
   listings = [...byKey.values()];
 
   if (listings.length === 0) return [];
 
+  listings = await enrichWithCoordinates(listings);
+
   const { data: existing, error: selectError } = await supabase
     .from("listings")
-    .select("source, external_id");
+    .select("source, external_id, latitude, longitude");
   if (selectError) throw new Error(`Failed to read existing listings: ${selectError.message}`);
+
+  const existingCoords = new Map<string, { lat: number; lng: number }>();
+  for (const row of existing ?? []) {
+    if (row.latitude != null && row.longitude != null) {
+      existingCoords.set(`${row.source}:${row.external_id}`, {
+        lat: row.latitude,
+        lng: row.longitude,
+      });
+    }
+  }
 
   const seen = new Set((existing ?? []).map((r) => `${r.source}:${r.external_id}`));
   const newOnes = listings.filter((l) => !seen.has(`${l.source}:${l.externalId}`));
 
   const now = new Date().toISOString();
-  const rows = listings.map((l) => ({
-    source: l.source,
-    external_id: l.externalId,
-    url: l.url,
-    title: l.title,
-    price: l.price,
-    bedrooms: l.bedrooms,
-    bathrooms: l.bathrooms,
-    sqft: l.sqft,
-    neighborhood: l.neighborhood,
-    address: l.address,
-    city: l.city,
-    image_url: l.imageUrl,
-    amenities: l.amenities,
-    posted_at: l.postedAt,
-    last_seen_at: now,
-    is_active: true,
-  }));
+  const rows = listings.map((l) => {
+    const cached = existingCoords.get(`${l.source}:${l.externalId}`);
+    const latitude = l.latitude ?? cached?.lat ?? null;
+    const longitude = l.longitude ?? cached?.lng ?? null;
+    return {
+      source: l.source,
+      external_id: l.externalId,
+      url: l.url,
+      title: l.title,
+      price: l.price,
+      bedrooms: l.bedrooms,
+      bathrooms: l.bathrooms,
+      sqft: l.sqft,
+      neighborhood: l.neighborhood,
+      address: l.address,
+      city: l.city,
+      state: l.state,
+      latitude,
+      longitude,
+      image_url: l.imageUrl,
+      amenities: l.amenities,
+      posted_at: l.postedAt,
+      last_seen_at: now,
+      is_active: true,
+    };
+  });
 
-  // Upsert in chunks to stay well under request size limits.
   for (let i = 0; i < rows.length; i += 200) {
     const chunk = rows.slice(i, i + 200);
     const { error } = await supabase
@@ -76,7 +142,18 @@ export async function storeListings(
     if (error) throw new Error(`Failed to upsert listings: ${error.message}`);
   }
 
-  return newOnes;
+  return newOnes.map((l) => {
+    const row = rows.find(
+      (r) => r.source === l.source && r.external_id === l.externalId,
+    );
+    return row
+      ? {
+          ...l,
+          latitude: row.latitude,
+          longitude: row.longitude,
+        }
+      : l;
+  });
 }
 
 export async function recordRun(run: {

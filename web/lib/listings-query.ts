@@ -1,0 +1,279 @@
+import type { ListingRow, SearchLocation } from "./supabase";
+import { withinRadiusMiles } from "./geo";
+import {
+  buildNeighborhoodOptions,
+  looksLikeNeighborhoodName,
+  parseNeighborhoodFilter,
+  type NeighborhoodOption,
+} from "./neighborhoods";
+
+export type { NeighborhoodOption };
+export { looksLikeNeighborhoodName, neighborhoodFilterLabel } from "./neighborhoods";
+// Supabase query builder types widen as filters chain; keep this loose.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type QueryLike = any;
+
+export const PAGE_SIZE = 50;
+
+export type ListingFilters = {
+  tab: string;
+  minPrice: string;
+  maxPrice: string;
+  beds: string;
+  minSqft: string;
+  neighborhoods: string[];
+  cities: string[];
+  source: string;
+  radiusMiles: string;
+  page: string;
+};
+
+export function parseListParam(
+  params: { [key: string]: string | string[] | undefined },
+  key: string,
+): string[] {
+  const raw = params[key];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (typeof raw === "string" && raw) {
+    return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+export function parseFilters(
+  params: { [key: string]: string | string[] | undefined },
+): ListingFilters {
+  const str = (k: string) =>
+    typeof params[k] === "string" ? (params[k] as string) : "";
+
+  return {
+    tab: str("tab") || "all",
+    minPrice: str("min_price"),
+    maxPrice: str("max_price"),
+    beds: str("beds"),
+    minSqft: str("min_sqft"),
+    neighborhoods: parseListParam(params, "neighborhood"),
+    cities: parseListParam(params, "city"),
+    source: str("source"),
+    radiusMiles: str("radius_miles"),
+    page: str("page") || "1",
+  };
+}
+
+export function parsePage(page: string | undefined): number {
+  const n = Number(page);
+  return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
+
+/** City centers for radius on the browse page — only for cities in the active filter. */
+export function buildRadiusCenters(
+  filterCities: string[],
+  prefLocations: SearchLocation[],
+): SearchLocation[] {
+  if (filterCities.length === 0) return [];
+  return filterCities.map((city) => {
+    const c = city.toLowerCase();
+    const pref = prefLocations.find((l) => l.city.toLowerCase() === c);
+    return (
+      pref ?? { city: c, state: "", center_lat: null, center_lng: null }
+    );
+  });
+}
+
+export function applyListingFilters(
+  query: QueryLike,
+  filters: ListingFilters,
+  options?: {
+    includeNeighborhoodFilter?: boolean;
+    includeCityFilter?: boolean;
+    select?: string;
+  },
+): QueryLike {
+  // PostgrestQueryBuilder (before .select()) has no .eq(); PostgrestFilterBuilder does.
+  if (typeof query.eq !== "function") {
+    query = query.select(options?.select ?? "id");
+  }
+
+  const includeNeighborhood = options?.includeNeighborhoodFilter !== false;
+  const includeCity = options?.includeCityFilter !== false;
+  const { tab } = filters;
+
+  if (tab === "hidden") {
+    query = query.eq("is_hidden", true);
+  } else {
+    query = query.eq("is_hidden", false);
+    if (tab === "new") {
+      query = query.gte(
+        "first_seen_at",
+        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      );
+    }
+    if (tab === "favorites") query = query.eq("is_favorite", true);
+  }
+
+  if (filters.minPrice) query = query.gte("price", Number(filters.minPrice));
+  if (filters.maxPrice) query = query.lte("price", Number(filters.maxPrice));
+  if (filters.beds) query = query.gte("bedrooms", Number(filters.beds));
+  if (filters.minSqft) query = query.gte("sqft", Number(filters.minSqft));
+  if (includeCity && filters.cities.length > 0) {
+    query = query.in("city", filters.cities);
+  }
+  if (includeNeighborhood && filters.neighborhoods.length > 0) {
+    const clauses = filters.neighborhoods.map((token) => {
+      const { city, name } = parseNeighborhoodFilter(token);
+      const pattern = `%${name.replace(/,/g, "")}%`;
+      if (city) {
+        return `and(city.eq.${city},neighborhood.ilike.${pattern})`;
+      }
+      return `neighborhood.ilike.${pattern}`;
+    });
+    query = query.or(clauses.join(","));
+  }  if (filters.source) query = query.eq("source", filters.source);
+
+  return query;
+}
+
+export function filterByRadius(
+  listings: ListingRow[],
+  radiusMiles: string | number | null | undefined,
+  locations: SearchLocation[],
+): ListingRow[] {
+  const radius = radiusMiles ? Number(radiusMiles) : null;
+  if (!radius || !Number.isFinite(radius)) return listings;
+
+  const centers = new Map<string, { lat: number; lng: number }>();
+  for (const loc of locations) {
+    if (loc.center_lat != null && loc.center_lng != null) {
+      centers.set(`${loc.city}:${loc.state}`, {
+        lat: loc.center_lat,
+        lng: loc.center_lng,
+      });
+    }
+  }
+  if (centers.size === 0) return listings;
+
+  return listings.filter((l) => {
+    if (l.latitude == null || l.longitude == null) return false;
+    const key = `${l.city.toLowerCase()}:${(l.state ?? "").toLowerCase()}`;
+    const center = centers.get(key);
+    if (!center) return false;
+    return withinRadiusMiles(
+      center,
+      { lat: l.latitude, lng: l.longitude },
+      radius,
+    );
+  });
+}
+
+export function buildFilterQueryString(
+  filters: ListingFilters,
+  overrides?: Partial<ListingFilters> & { tab?: string },
+): string {
+  const next = new URLSearchParams();
+  const f = { ...filters, ...overrides };
+
+  if (f.tab && f.tab !== "all") next.set("tab", f.tab);
+  if (f.minPrice) next.set("min_price", f.minPrice);
+  if (f.maxPrice) next.set("max_price", f.maxPrice);
+  if (f.beds) next.set("beds", f.beds);
+  if (f.minSqft) next.set("min_sqft", f.minSqft);
+  if (f.source) next.set("source", f.source);
+  if (f.radiusMiles) next.set("radius_miles", f.radiusMiles);
+  if (f.page && f.page !== "1") next.set("page", f.page);
+  for (const c of f.cities) next.append("city", c);
+  for (const n of f.neighborhoods) next.append("neighborhood", n);
+
+  return next.toString();
+}
+
+type QueryFactory = () => QueryLike;
+
+async function fetchDistinctNeighborhoodPairs(
+  buildQuery: QueryFactory,
+): Promise<Array<{ city: string; neighborhood: string }>> {
+  const pairs = new Map<string, { city: string; neighborhood: string }>();
+  const pageSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    let q = buildQuery().select("city, neighborhood").order("id");
+    q = q.not("neighborhood", "is", null);
+    const { data, error } = await q.range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    for (const row of data) {
+      if (!row.city || !row.neighborhood) continue;
+      const key = `${row.city}\0${row.neighborhood}`;
+      pairs.set(key, { city: row.city, neighborhood: row.neighborhood });
+    }
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return [...pairs.values()];
+}
+
+async function fetchDistinctColumn(
+  buildQuery: QueryFactory,
+  column: "neighborhood" | "city",
+  notNull = false,
+): Promise<string[]> {
+  const values = new Set<string>();
+  const pageSize = 1000;
+  let offset = 0;
+
+  while (true) {
+    let q = buildQuery().select(column).order("id");
+    if (notNull) q = q.not(column, "is", null);
+    const { data, error } = await q.range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    for (const row of data) {
+      const value = row[column];
+      if (value) values.add(value);
+    }
+    if (data.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return [...values].sort((a, b) => a.localeCompare(b));
+}
+
+export async function fetchDistinctNeighborhoods(
+  buildQuery: QueryFactory,
+  activeCities: string[] = [],
+): Promise<NeighborhoodOption[]> {
+  const pairs = await fetchDistinctNeighborhoodPairs(buildQuery);
+  return buildNeighborhoodOptions(pairs, activeCities);
+}
+
+export async function fetchDistinctCities(
+  buildQuery: QueryFactory,
+): Promise<string[]> {
+  return fetchDistinctColumn(buildQuery, "city");
+}
+
+export function distinctNeighborhoodOptionsFromListings(
+  listings: Pick<ListingRow, "neighborhood" | "city">[],
+  activeCities: string[] = [],
+): NeighborhoodOption[] {
+  const pairs = listings
+    .filter((l) => l.neighborhood && l.city)
+    .map((l) => ({ city: l.city, neighborhood: l.neighborhood! }));
+  return buildNeighborhoodOptions(pairs, activeCities);
+}
+
+export function distinctFromListings(
+  listings: Pick<ListingRow, "neighborhood" | "city">[],
+  field: "neighborhood" | "city",
+  activeCities: string[] = [],
+): string[] | NeighborhoodOption[] {
+  if (field === "neighborhood") {
+    return distinctNeighborhoodOptionsFromListings(listings, activeCities);
+  }
+  const values = new Set<string>();
+  for (const listing of listings) {
+    if (listing.city) values.add(listing.city);
+  }
+  return [...values].sort((a, b) => a.localeCompare(b));
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Libre_Franklin } from "next/font/google";
+import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
 
@@ -15,8 +16,9 @@ const franklin = Libre_Franklin({
 });
 
 export const metadata: Metadata = {
-  title: "Apartment Hunt",
+  title: "Lease Locator",
   description: "Daily-scraped apartment listings, all in one place.",
+  applicationName: "Lease Locator",
 };
 
 export default function RootLayout({
@@ -26,14 +28,26 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${fraunces.variable} ${franklin.variable} min-h-screen`}>
         <header className="border-b-4 border-double border-ink/70 bg-paper">
-          <div className="mx-auto max-w-5xl px-6 pt-8 pb-4">
+          <div className="mx-auto max-w-5xl px-6 pt-6 pb-4">
             <p className="text-[11px] uppercase tracking-[0.35em] text-ink-soft">
               Scraped fresh, every morning
             </p>
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <h1 className="font-display text-5xl font-semibold tracking-tight">
-                The Apartment{" "}
-                <span className="italic font-normal text-rust">Hunt</span>
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+              <h1 className="m-0">
+                <Link
+                  href="/"
+                  aria-label="Lease Locator home"
+                  className="inline-block transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+                >
+                  <Image
+                    src="/logo.png"
+                    alt="Lease Locator"
+                    width={583}
+                    height={311}
+                    className="h-20 w-auto sm:h-28"
+                    priority
+                  />
+                </Link>
               </h1>
               <nav className="flex gap-1 pb-1 text-sm">
                 <Link

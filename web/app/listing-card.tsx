@@ -8,6 +8,10 @@ const SOURCE_LABELS: Record<string, string> = {
   craigslist: "Craigslist",
   apartments_com: "Apartments.com",
   seattle_rentals: "SeattleRentals",
+  chicago_rentals: "ChicagoRentals",
+  chicago_apartment_finders: "ChicagoApartmentFinders",
+  urban_abodes: "UrbanAbodes",
+  domu: "Domu",
 };
 
 export function ListingCard({

@@ -8,9 +8,13 @@ gives you a small web app to browse, filter, and favorite listings.
 
 | Source | Method | Notes |
 | --- | --- | --- |
-| Craigslist | Playwright | RSS feeds were removed in 2023, so we scrape the search page. Filters (price/beds/baths/sqft) are passed in the URL. |
-| Apartments.com | Playwright (real Chrome) | No public API. Their bot protection (Akamai) blocks headless Chromium but lets real Chrome through — and blocks are intermittent regardless. The scraper retries once and the pipeline carries on with the other sources if it's blocked that day. |
-| SeattleRentals.com | fetch + cheerio | Fully server-rendered; plain HTTP works. |
+| Craigslist | Playwright | RSS feeds were removed in 2023, so we scrape the search page. Filters (price/beds/baths/sqft) are passed in the URL. Runs for every city in Preferences. |
+| Apartments.com | Playwright (real Chrome) | No public API. Their bot protection (Akamai) blocks headless Chromium but lets real Chrome through — and blocks are intermittent regardless. The scraper retries once and the pipeline carries on with the other sources if it's blocked that day. Runs for every city in Preferences. |
+| SeattleRentals.com | fetch + cheerio | Fully server-rendered; plain HTTP works. Seattle only. |
+| ChicagoRentals.com | WP REST API + cheerio | Communities via REST; individual units scraped from each community page. Chicago, IL only. |
+| ChicagoApartmentFinders | fetch + cheerio | RealtyMX browser search with POST pagination. Chicago, IL only. |
+| UrbanAbodes | Playwright | Next.js client-rendered search page. Chicago, IL only. |
+| Domu | Playwright | Map search page (JS-rendered). Chicago, IL only. |
 
 All scraping is once daily, low volume, for personal use. Be kind to the sites.
 
@@ -81,7 +85,21 @@ flags. A listing is "new" if that key has never been seen before.
 
 ## Scaling to other cities
 
-Preferences store the city. Craigslist uses `<city>.craigslist.org` and
-Apartments.com uses `/<city>-wa/` (currently hard-coded to WA state).
-SeattleRentals is Seattle-only and will just be skipped for other cities —
-generalizing the state suffix + adding per-city sources is the main TODO.
+Preferences store one or more **locations** (`city` + 2-letter `state`).
+Each location is scraped separately:
+
+- Craigslist → `<city>.craigslist.org` (any US city with a Craigslist subdomain)
+- Apartments.com → `/<city>-<state>/` (e.g. `seattle-wa`, `chicago-il`)
+- SeattleRentals → Seattle only; skipped for other cities
+- ChicagoRentals, ChicagoApartmentFinders, UrbanAbodes, Domu → Chicago, IL only
+
+Add Chicago by clicking **+ Add location** on the Preferences page
+(`chicago` / `il`), save, then run `npm run scrape`. You can keep multiple
+cities at once (e.g. Seattle + Chicago) — national sources scrape both.
+
+## Radius filter
+
+Set **radius in miles** on Preferences. The center for each search city is
+geocoded automatically as that city&apos;s downtown (no address to type).
+Save Preferences after adding/changing cities so centers are refreshed.
+Listings are geocoded during scrapes (up to 120 per run).

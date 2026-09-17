@@ -6,11 +6,14 @@ import { launchBrowser } from "./browser.js";
 import { scrapeCraigslist } from "./sources/craigslist.js";
 import { scrapeApartmentsCom } from "./sources/apartmentsCom.js";
 import { scrapeSeattleRentals } from "./sources/seattleRentals.js";
-import type { Preferences } from "./types.js";
+import type { Preferences, SearchLocation } from "./types.js";
+
+const location: SearchLocation = { city: "seattle", state: "wa" };
 
 const prefs: Preferences = {
   key: "default",
   city: "seattle",
+  locations: [location],
   min_price: null,
   max_price: 3000,
   min_beds: null,
@@ -20,14 +23,18 @@ const prefs: Preferences = {
   neighborhoods: [],
   keywords: [],
   email_to: null,
+  radius_miles: null,
+  radius_center: null,
+  radius_center_lat: null,
+  radius_center_lng: null,
 };
 
 const { browser, context } = await launchBrowser();
 
 for (const [name, run] of [
-  ["craigslist", () => scrapeCraigslist(context, prefs)],
-  ["apartments_com", () => scrapeApartmentsCom(context, prefs)],
-  ["seattle_rentals", () => scrapeSeattleRentals(prefs)],
+  ["craigslist", () => scrapeCraigslist(context, prefs, location)],
+  ["apartments_com", () => scrapeApartmentsCom(context, prefs, location)],
+  ["seattle_rentals", () => scrapeSeattleRentals(prefs, location)],
 ] as const) {
   try {
     const listings = await run();

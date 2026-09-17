@@ -1,5 +1,5 @@
 import type { BrowserContext } from "playwright";
-import type { Preferences, ScrapedListing } from "../types.js";
+import type { Preferences, ScrapedListing, SearchLocation } from "../types.js";
 
 /**
  * Craigslist removed its RSS feeds in 2023, so we scrape the search results
@@ -9,6 +9,7 @@ import type { Preferences, ScrapedListing } from "../types.js";
 export async function scrapeCraigslist(
   context: BrowserContext,
   prefs: Preferences,
+  location: SearchLocation,
 ): Promise<ScrapedListing[]> {
   const params = new URLSearchParams();
   if (prefs.min_price != null) params.set("min_price", String(prefs.min_price));
@@ -22,7 +23,7 @@ export async function scrapeCraigslist(
   if (prefs.min_sqft != null) params.set("minSqft", String(prefs.min_sqft));
 
   // City subdomain, e.g. seattle.craigslist.org. Works for most US cities.
-  const subdomain = prefs.city.toLowerCase().replace(/[^a-z]/g, "");
+  const subdomain = location.city.toLowerCase().replace(/[^a-z]/g, "");
   const url = `https://${subdomain}.craigslist.org/search/apa?${params.toString()}`;
 
   const page = await context.newPage();
@@ -104,7 +105,10 @@ export async function scrapeCraigslist(
         sqft: matchNumber(i.sqftText, /(\d+)\s*ft/i),
         neighborhood: i.location || null,
         address: null,
-        city: prefs.city,
+        city: location.city,
+        state: location.state,
+        latitude: null,
+        longitude: null,
         imageUrl: i.imageUrl,
         amenities: [],
         postedAt: null,
