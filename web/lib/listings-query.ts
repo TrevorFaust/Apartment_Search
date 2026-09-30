@@ -268,20 +268,30 @@ export function hasActiveFilters(f: ListingFilters): boolean {
 
 type QueryFactory = () => QueryLike;
 
+/** Radius is applied in JS after the query, so facets need it passed separately. */
+export type RadiusScope = { miles: string; locations: SearchLocation[] };
+
 async function fetchDistinctNeighborhoodPairs(
   buildQuery: QueryFactory,
+  radius?: RadiusScope,
 ): Promise<Array<{ city: string; neighborhood: string }>> {
   const pairs = new Map<string, { city: string; neighborhood: string }>();
   const pageSize = 1000;
   let offset = 0;
 
   while (true) {
-    let q = buildQuery().select("city, neighborhood").order("id");
+    let q = buildQuery()
+      .select(radius ? "city, state, neighborhood, latitude, longitude" : "city, neighborhood")
+      .order("id");
     q = q.not("neighborhood", "is", null);
+    if (radius) q = q.not("latitude", "is", null);
     const { data, error } = await q.range(offset, offset + pageSize - 1);
     if (error) throw error;
     if (!data?.length) break;
-    for (const row of data) {
+    const rows = radius
+      ? filterByRadius(data as ListingRow[], radius.miles, radius.locations)
+      : data;
+    for (const row of rows) {
       if (!row.city || !row.neighborhood) continue;
       const key = `${row.city}\0${row.neighborhood}`;
       pairs.set(key, { city: row.city, neighborhood: row.neighborhood });
@@ -322,9 +332,63 @@ async function fetchDistinctColumn(
 export async function fetchDistinctNeighborhoods(
   buildQuery: QueryFactory,
   activeCities: string[] = [],
+  radius?: RadiusScope,
 ): Promise<NeighborhoodOption[]> {
-  const pairs = await fetchDistinctNeighborhoodPairs(buildQuery);
+  const pairs = await fetchDistinctNeighborhoodPairs(buildQuery, radius);
   return buildNeighborhoodOptions(pairs, activeCities);
+}
+
+export type MatchStats = {
+  medianPrice: number | null;
+  minPrice: number | null;
+  maxPrice: number | null;
+  newToday: number;
+};
+
+export function summarizeListings(
+  rows: Pick<ListingRow, "price" | "first_seen_at">[],
+): MatchStats {
+  const prices = rows
+    .map((r) => r.price)
+    .filter((p): p is number => p != null && p > 0)
+    .sort((a, b) => a - b);
+  const mid = Math.floor(prices.length / 2);
+  const medianPrice =
+    prices.length === 0
+      ? null
+      : prices.length % 2
+        ? prices[mid]!
+        : Math.round((prices[mid - 1]! + prices[mid]!) / 2);
+  const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+  return {
+    medianPrice,
+    minPrice: prices[0] ?? null,
+    maxPrice: prices.at(-1) ?? null,
+    newToday: rows.filter((r) => new Date(r.first_seen_at).getTime() >= dayAgo).length,
+  };
+}
+
+/** Price and freshness for every match, fetched in parallel pages. */
+export async function fetchMatchStats(
+  buildQuery: QueryFactory,
+  total: number,
+): Promise<MatchStats> {
+  const pageSize = 1000;
+  const pages = Math.min(Math.ceil(total / pageSize), 20);
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) =>
+      buildQuery()
+        .select("price, first_seen_at")
+        .order("id")
+        .range(i * pageSize, (i + 1) * pageSize - 1),
+    ),
+  );
+  const rows: Pick<ListingRow, "price" | "first_seen_at">[] = [];
+  for (const { data, error } of results) {
+    if (error) throw error;
+    rows.push(...(data ?? []));
+  }
+  return summarizeListings(rows);
 }
 
 export async function fetchDistinctCities(

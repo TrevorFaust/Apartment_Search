@@ -19,14 +19,18 @@ import {
   fetchDistinctCities,
   fetchDistinctNeighborhoods,
   distinctNeighborhoodOptionsFromListings,
+  fetchMatchStats,
   filterByRadius,
   hasActiveFilters,
   MAX_LISTING_AGE_DAYS,
+  neighborhoodFilterLabel,
   PAGE_SIZE,
   parseFilters,
   parsePage,
   POSTED_WITHIN_OPTIONS,
   SORT_OPTIONS,
+  summarizeListings,
+  type MatchStats,
 } from "@/lib/listings-query";
 
 export const dynamic = "force-dynamic";
@@ -43,19 +47,32 @@ const TABS = [
   { id: "hidden", label: "Hidden" },
 ] as const;
 
-function leadPlace(listing: ListingRow | undefined): string | null {
-  if (!listing) return null;
-  const raw = (listing.neighborhood?.trim() || listing.city).split(",")[0]?.trim() || listing.city;
-  return raw.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+const dollars = (n: number) => `$${n.toLocaleString("en-US")}`;
+
+function matchCountLabel(count: number): string {
+  return `${count.toLocaleString("en-US")} ${count === 1 ? "listing" : "listings"}`;
 }
 
-function leadDetail(listing: ListingRow): string {
-  return [
-    listing.bedrooms != null ? `${listing.bedrooms} bed` : null,
-    listing.price != null ? `$${listing.price.toLocaleString("en-US")}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+function matchSummary(stats: MatchStats | null, neighborhoodCount: number): string {
+  const parts: string[] = [];
+  if (stats?.medianPrice != null) {
+    const range =
+      stats.minPrice != null && stats.maxPrice != null && stats.minPrice !== stats.maxPrice
+        ? `, ranging ${dollars(stats.minPrice)} to ${dollars(stats.maxPrice)}`
+        : "";
+    parts.push(`Median rent ${dollars(stats.medianPrice)}${range}`);
+  }
+  if (neighborhoodCount > 0) {
+    parts.push(
+      `${parts.length ? "across" : "Across"} ${neighborhoodCount} ${neighborhoodCount === 1 ? "neighborhood" : "neighborhoods"}`,
+    );
+  }
+  const sentence = parts.length ? `${parts.join(" ")}.` : "";
+  const fresh =
+    stats && stats.newToday > 0
+      ? ` ${stats.newToday.toLocaleString("en-US")} arrived in the last day.`
+      : "";
+  return `${sentence}${fresh}`.trim();
 }
 
 export default async function ListingsPage({
@@ -89,6 +106,12 @@ export default async function ListingsPage({
 
   const searchLocations = buildRadiusCenters(filters.cities, prefLocations);
 
+  const radiusActive =
+    filters.radiusMiles && Number.isFinite(Number(filters.radiusMiles));
+  const hasRadius =
+    radiusActive &&
+    searchLocations.some((l) => l.center_lat != null && l.center_lng != null);
+
   const buildFacetQuery = () =>
     applyListingFilters(supabaseAdmin().from("listings"), filters, {
       includeNeighborhoodFilter: false,
@@ -100,7 +123,13 @@ export default async function ListingsPage({
   const facetsPromise = (async () => {
     try {
       const [neighborhoodOptions, cityOptions] = await Promise.all([
-        fetchDistinctNeighborhoods(buildFacetQuery, filters.cities),
+        fetchDistinctNeighborhoods(
+          buildFacetQuery,
+          filters.cities,
+          hasRadius
+            ? { miles: filters.radiusMiles, locations: searchLocations }
+            : undefined,
+        ),
         fetchDistinctCities(buildFacetQuery),
       ]);
       return { neighborhoodOptions, cityOptions };
@@ -115,14 +144,9 @@ export default async function ListingsPage({
     }
   })();
 
-  const radiusActive =
-    filters.radiusMiles && Number.isFinite(Number(filters.radiusMiles));
-  const hasRadius =
-    radiusActive &&
-    searchLocations.some((l) => l.center_lat != null && l.center_lng != null);
-
   let listings: ListingRow[] = [];
   let totalCount = 0;
+  let stats: MatchStats | null = null;
 
   if (hasRadius) {
     const { data, error } = await applyListingSort(
@@ -140,6 +164,7 @@ export default async function ListingsPage({
       searchLocations,
     );
     totalCount = allFiltered.length;
+    stats = summarizeListings(allFiltered);
     const offset = (page - 1) * PAGE_SIZE;
     listings = allFiltered.slice(offset, offset + PAGE_SIZE);
   } else {
@@ -161,16 +186,26 @@ export default async function ListingsPage({
     const safePage = Math.min(page, totalPages);
     const offset = (safePage - 1) * PAGE_SIZE;
 
-    const { data, error } = await applyListingSort(
-      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters, { marks }),
-      filters.sort,
-    ).range(offset, offset + PAGE_SIZE - 1);
+    const [{ data, error }, matchStats] = await Promise.all([
+      applyListingSort(
+        applyListingFilters(supabaseAdmin().from("listings").select("*"), filters, { marks }),
+        filters.sort,
+      ).range(offset, offset + PAGE_SIZE - 1),
+      fetchMatchStats(
+        () => applyListingFilters(supabaseAdmin().from("listings"), filters, { marks }),
+        totalCount,
+      ).catch((err) => {
+        console.error("Failed to load match stats:", err);
+        return null;
+      }),
+    ]);
 
     if (error) {
       return <LoadError message={error.message} />;
     }
 
     listings = (data ?? []) as ListingRow[];
+    stats = matchStats;
   }
 
   let { neighborhoodOptions, cityOptions } = await facetsPromise;
@@ -181,6 +216,13 @@ export default async function ListingsPage({
       filters.cities,
     );
   }
+  const availableNeighborhoods = neighborhoodOptions.length;
+  // A picked neighborhood can fall outside new filters; keep it listed so it can be unchecked.
+  const optionValues = new Set(neighborhoodOptions.map((o) => o.value));
+  const strandedPicks = filters.neighborhoods
+    .filter((value) => !optionValues.has(value))
+    .map((value) => ({ value, label: neighborhoodFilterLabel(value, filters.cities) }));
+  if (strandedPicks.length) neighborhoodOptions = [...neighborhoodOptions, ...strandedPicks];
   if (cityOptions.length === 0 && listings.length > 0) {
     cityOptions = [...new Set(listings.map((l) => l.city).filter(Boolean))].sort(
       (a, b) => a.localeCompare(b),
@@ -201,18 +243,22 @@ export default async function ListingsPage({
   if (filters.tab !== "all") clearAllQs.set("tab", filters.tab);
   if (filters.sort !== "newest") clearAllQs.set("sort", filters.sort);
   const clearAllHref = clearAllQs.size ? `/?${clearAllQs}` : "/";
+  const filtersActive = hasActiveFilters(filters);
 
   return (
     <div className="rise">
       <div className="mb-8 border-b border-ink/15 pb-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-brass">Newest on the board</p>
+          <p className="text-xs uppercase tracking-[0.32em] text-brass">
+            {filtersActive ? "Matching your filters" : "On the board"}
+          </p>
           <p className="mt-2 font-display text-4xl leading-none font-medium tracking-tight text-ink sm:text-5xl">
-            {leadPlace(listings[0]) ?? "Quiet for now"}
+            {totalCount > 0 ? matchCountLabel(totalCount) : "No matches"}
           </p>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
-            {listings[0]
-              ? `${leadDetail(listings[0]) ? `${leadDetail(listings[0])}. ` : ""}Scroll for the rest, and track a place once you message or book a tour.`
+            {totalCount > 0
+              ? matchSummary(stats, filters.neighborhoods.length || availableNeighborhoods) ||
+                "Track a place once you message the owner or book a tour."
               : filters.tab === "pursuing"
                 ? "Track a place from the board once you message the owner or book a tour."
                 : "Nothing matches these filters. Widen them, or check back in the morning."}
@@ -323,6 +369,11 @@ export default async function ListingsPage({
       </FilterForm>
 
       <p className="mb-8 text-xs leading-relaxed tracking-wide text-ink-faint">
+        {filtersActive && (
+          <span className="font-medium text-ink">
+            {`${matchCountLabel(totalCount)} ${totalCount === 1 ? "matches" : "match"} these filters. `}
+          </span>
+        )}
         {`Only listings posted in the last ${MAX_LISTING_AGE_DAYS} days that are still online. `}
         Each one is re-checked daily and dropped once it&apos;s taken down.
       </p>
