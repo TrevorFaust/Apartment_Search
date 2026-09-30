@@ -199,7 +199,14 @@ LIVENESS_BUDGET=3000 npm run check-listings
 
 Filter by max price, beds, size, city, neighborhood, radius, source, and how
 recently a listing was posted (24 hours to 2 months). Each filter has a small ×
-to clear it, and **Clear all** resets everything but the tab and sort. Sort by
+to clear it, and **Clear all** resets everything but the tab and sort. The
+neighborhood picker is searchable, shows how many matching listings each
+neighborhood has, and lists your picks as removable chips under the field.
+**Map area** opens a map where you press and drag to outline the exact area you
+want; only listings with a pin inside the outline show (the outline rides in
+the URL as `area`). Clicking a listing opens a preview panel with its photo,
+facts, amenities, and map, plus a link to the source site; Ctrl/⌘-click still
+opens the source directly. Sort by
 newest/oldest posted, price, size, or bedrooms. The page-number strip hugs
 however many pages there are, centered; once they don't fit it scrolls (drag,
 swipe, or mouse-wheel to jump anywhere). Colors follow the shared

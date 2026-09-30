@@ -8,6 +8,7 @@ import type { MapPoint } from "@/lib/area-maps";
 import type { Pursuit } from "@/lib/marks";
 import { toggleFavorite, toggleHidden, updatePursuit } from "./actions";
 import { MapThumb } from "./map-thumb";
+import { ListingPreview } from "./listing-preview";
 
 export function ListingCard({
   listing,
@@ -29,6 +30,13 @@ export function ListingCard({
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<Pursuit | null>(pursuit);
   const [imageFailed, setImageFailed] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  // Plain click previews; ctrl/cmd/shift/middle click still opens the source in a new tab.
+  const openPreview = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    setPreviewing(true);
+  };
   const isNew = now - new Date(listing.first_seen_at).getTime() < 24 * 60 * 60 * 1000;
   const isGone = !listing.is_active;
   const sourceLabel = labelForSource(listing.source);
@@ -59,8 +67,9 @@ export function ListingCard({
         href={listing.url}
         target="_blank"
         rel="noreferrer"
+        onClick={openPreview}
         className="relative block"
-        aria-label={`Open ${listing.title} on ${sourceLabel}`}
+        aria-label={`Preview ${listing.title}`}
       >
         <div className="relative aspect-[4/3] overflow-hidden bg-bg-deep">
           {listing.image_url?.startsWith("http") && !imageFailed ? (
@@ -91,7 +100,7 @@ export function ListingCard({
           )}
           <div className="pointer-events-none absolute inset-0 bg-ink/0 transition-colors duration-300 group-hover:bg-ink/15" />
           <span className="pointer-events-none absolute bottom-3 right-3 translate-y-1 bg-ink/90 px-2.5 py-1.5 text-[11px] uppercase tracking-[0.18em] text-metal opacity-0 transition-all duration-300 ease-out-soft group-hover:translate-y-0 group-hover:opacity-100">
-            View on {sourceLabel}
+            Preview
           </span>
           {isGone ? (
             <span className="absolute left-3 top-3 bg-ink px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-bg-elevated">
@@ -120,6 +129,7 @@ export function ListingCard({
           href={listing.url}
           target="_blank"
           rel="noreferrer"
+          onClick={openPreview}
           className="font-display text-lg leading-snug font-medium decoration-brass underline-offset-4 transition-colors hover:text-brass hover:underline"
         >
           {listing.title}
@@ -226,6 +236,17 @@ export function ListingCard({
           </button>
         </div>
       </div>
+      {previewing && (
+        <ListingPreview
+          listing={listing}
+          sourceLabel={sourceLabel}
+          facts={facts as string[]}
+          listedAt={listedAt}
+          listedHint={listedHint}
+          mapPoint={mapPoint}
+          onClose={() => setPreviewing(false)}
+        />
+      )}
     </article>
   );
 }

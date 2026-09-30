@@ -2,7 +2,13 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
-export type DropdownOption = { value: string; label: string; sublabel?: string };
+export type DropdownOption = {
+  value: string;
+  label: string;
+  sublabel?: string;
+  /** Matching listings, shown after the label. */
+  count?: number;
+};
 
 /** Button + floating panel shared by every filter dropdown. */
 export function Dropdown({
@@ -111,7 +117,12 @@ export function FieldLabel({
 export function OptionText({ option }: { option: DropdownOption }) {
   return (
     <span className="flex min-w-0 flex-col">
-      <span className="break-words">{option.label}</span>
+      <span className="break-words">
+        {option.label}
+        {option.count != null && (
+          <span className="ml-1 text-ink-faint tabular-nums">({option.count})</span>
+        )}
+      </span>
       {option.sublabel && (
         <span className="text-[11px] leading-tight text-ink-faint">{option.sublabel}</span>
       )}

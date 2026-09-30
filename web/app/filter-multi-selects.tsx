@@ -19,6 +19,7 @@ export function NeighborhoodMultiSelect({
       selected={selected}
       emptyLabel="Any neighborhood"
       clearSubmits
+      searchable
     />
   );
 }

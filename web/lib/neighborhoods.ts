@@ -5,6 +5,8 @@ export type NeighborhoodOption = {
   label: string;
   /** Metro shown under the label when several cities are in play. */
   sublabel?: string;
+  /** Listings in this neighborhood that match the other filters. */
+  count?: number;
 };
 
 const CITY_NAMES = new Set([
@@ -70,9 +72,15 @@ function titleCaseWords(text: string): string {
 export function canonicalNeighborhood(
   searchCity: string,
   raw: string,
+  /** Lowercased names seen on their own; "X Highlands" only folds into X when X is one. */
+  knownNames?: Set<string>,
 ): string | null {
   const city = searchCity.toLowerCase().trim();
-  const v = raw.trim();
+  const v = raw
+    .trim()
+    .replace(/(,\s*|\s+)(seattle|chicago)(\s+(wa|il))?\s*$/i, "")
+    .replace(/\s+area$/i, "")
+    .trim();
   if (!looksLikeNeighborhoodName(v)) return null;
 
   // Skip multi-municipality laundry lists.
@@ -108,7 +116,10 @@ export function canonicalNeighborhood(
   );
   if (suffixParent) {
     const parent = suffixParent[1].trim();
-    if (looksLikeNeighborhoodName(parent)) return titleCaseWords(parent);
+    // Without this check Wicker Park, Logan Square, and Ukrainian Village lose their last word.
+    if (looksLikeNeighborhoodName(parent) && (!knownNames || knownNames.has(parent.toLowerCase()))) {
+      return titleCaseWords(parent);
+    }
   }
 
   // "Cascade / SE Renton" → Renton.
@@ -177,7 +188,7 @@ export function neighborhoodFilterLabel(
 }
 
 export function buildNeighborhoodOptions(
-  pairs: Array<{ city: string; neighborhood: string }>,
+  pairs: Array<{ city: string; neighborhood: string; count?: number }>,
   activeCities: string[] = [],
 ): NeighborhoodOption[] {
   const scopedCities =
@@ -186,23 +197,28 @@ export function buildNeighborhoodOptions(
       : null;
 
   const byKey = new Map<string, NeighborhoodOption>();
+  const knownNames = new Set(pairs.map((p) => p.neighborhood.trim().toLowerCase()));
 
-  for (const { city, neighborhood } of pairs) {
+  for (const { city, neighborhood, count = 1 } of pairs) {
     const searchCity = city.toLowerCase().trim();
     if (scopedCities && !scopedCities.has(searchCity)) continue;
 
-    const canonical = canonicalNeighborhood(searchCity, neighborhood);
+    const canonical = canonicalNeighborhood(searchCity, neighborhood, knownNames);
     if (!canonical) continue;
 
     const value = neighborhoodFilterToken(searchCity, canonical);
-    if (byKey.has(value)) continue;
+    const existing = byKey.get(value);
+    if (existing) {
+      existing.count = (existing.count ?? 0) + count;
+      continue;
+    }
 
     const metro = METRO_LABEL[searchCity] ?? titleCaseWords(searchCity);
     byKey.set(
       value,
       scopedCities?.size === 1
-        ? { value, label: canonical }
-        : { value, label: canonical, sublabel: metro },
+        ? { value, label: canonical, count }
+        : { value, label: canonical, sublabel: metro, count },
     );
   }
 

@@ -7,7 +7,9 @@ import { FilterForm } from "./filter-form";
 import { LinkPending } from "./link-pending";
 import { PageStrip } from "./page-strip";
 import { FilterInput } from "./filter-input";
-import { SOURCE_OPTIONS } from "@/lib/sources";
+import { SOURCE_OPTIONS, titleCase } from "@/lib/sources";
+import { parseArea } from "@/lib/geo";
+import { AreaFilter } from "./area-filter";
 import { getViewer } from "@/lib/auth";
 import { resolveMapPoints } from "@/lib/area-maps";
 import { getMarks } from "@/lib/marks";
@@ -20,8 +22,11 @@ import {
   fetchDistinctNeighborhoods,
   distinctNeighborhoodOptionsFromListings,
   fetchMatchStats,
-  filterByRadius,
+  filterByGeoScope,
   hasActiveFilters,
+  hasGeoScope,
+  narrowToGeoScope,
+  type GeoScope,
   MAX_LISTING_AGE_DAYS,
   neighborhoodFilterLabel,
   PAGE_SIZE,
@@ -111,6 +116,23 @@ export default async function ListingsPage({
   const hasRadius =
     radiusActive &&
     searchLocations.some((l) => l.center_lat != null && l.center_lng != null);
+  const drawnArea = parseArea(filters.area);
+  const geoScope: GeoScope = {
+    radius: hasRadius ? { miles: filters.radiusMiles, locations: searchLocations } : undefined,
+    area: drawnArea ?? undefined,
+  };
+  const geoActive = hasGeoScope(geoScope);
+
+  const radiusCities = searchLocations
+    .filter((l) => l.center_lat != null && l.center_lng != null)
+    .map((l) => titleCase(l.city));
+  const radiusHint = radiusCities.length
+    ? `from downtown ${radiusCities.join(" and ")}`
+    : "from downtown; pick a city first";
+
+  const mapCenters = (filters.cities.length ? searchLocations : prefLocations)
+    .filter((l) => l.center_lat != null && l.center_lng != null)
+    .map((l) => ({ lat: l.center_lat!, lng: l.center_lng! }));
 
   const buildFacetQuery = () =>
     applyListingFilters(supabaseAdmin().from("listings"), filters, {
@@ -123,13 +145,7 @@ export default async function ListingsPage({
   const facetsPromise = (async () => {
     try {
       const [neighborhoodOptions, cityOptions] = await Promise.all([
-        fetchDistinctNeighborhoods(
-          buildFacetQuery,
-          filters.cities,
-          hasRadius
-            ? { miles: filters.radiusMiles, locations: searchLocations }
-            : undefined,
-        ),
+        fetchDistinctNeighborhoods(buildFacetQuery, filters.cities, geoScope),
         fetchDistinctCities(buildFacetQuery),
       ]);
       return { neighborhoodOptions, cityOptions };
@@ -148,9 +164,12 @@ export default async function ListingsPage({
   let totalCount = 0;
   let stats: MatchStats | null = null;
 
-  if (hasRadius) {
+  if (geoActive) {
     const { data, error } = await applyListingSort(
-      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters, { marks }),
+      narrowToGeoScope(
+        applyListingFilters(supabaseAdmin().from("listings").select("*"), filters, { marks }),
+        geoScope,
+      ),
       filters.sort,
     ).limit(10000);
 
@@ -158,11 +177,7 @@ export default async function ListingsPage({
       return <LoadError message={error.message} />;
     }
 
-    const allFiltered = filterByRadius(
-      (data ?? []) as ListingRow[],
-      filters.radiusMiles,
-      searchLocations,
-    );
+    const allFiltered = filterByGeoScope((data ?? []) as ListingRow[], geoScope);
     totalCount = allFiltered.length;
     stats = summarizeListings(allFiltered);
     const offset = (page - 1) * PAGE_SIZE;
@@ -335,8 +350,9 @@ export default async function ListingsPage({
           name="radius_miles"
           defaultValue={filters.radiusMiles}
           decimals
-          hint="from downtown; pick a city first"
+          hint={radiusHint}
         />
+        <AreaFilter value={filters.area} centers={mapCenters} />
         <AutoSubmitSelect
           label="Source"
           name="source"
@@ -385,10 +401,10 @@ export default async function ListingsPage({
         </p>
       )}
 
-      {hasRadius && listings.length === 0 && totalCount === 0 && (
+      {geoActive && listings.length === 0 && totalCount === 0 && (
         <p className="mb-4 border border-dashed border-brass/60 bg-bg-elevated p-4 text-sm text-ink-soft">
-          No listings within {filters.radiusMiles} mi. Listings may lack
-          coordinates yet — run <code>npm run scrape</code> to geocode them.
+          {drawnArea ? "No listings inside the drawn area" : `No listings within ${filters.radiusMiles} mi`}.
+          Only listings with an exact map pin can match, and many don&apos;t have one yet.
         </p>
       )}
 

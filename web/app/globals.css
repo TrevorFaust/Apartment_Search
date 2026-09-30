@@ -126,6 +126,17 @@
   animation: rise 0.5s var(--ease-out-soft) both;
 }
 
+@keyframes preview-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 @keyframes progress {
   0% {
     transform: scaleX(0);

@@ -1,6 +1,12 @@
 import type { ListingRow, SearchLocation } from "./supabase";
 import { parseAmount } from "./amounts";
-import { withinRadiusMiles } from "./geo";
+import {
+  parseArea,
+  pointInPolygon,
+  polygonBounds,
+  withinRadiusMiles,
+  type Coordinates,
+} from "./geo";
 import {
   buildNeighborhoodOptions,
   looksLikeNeighborhoodName,
@@ -47,6 +53,8 @@ export type ListingFilters = {
   cities: string[];
   source: string;
   radiusMiles: string;
+  /** Drawn map area as `lat,lng;lat,lng;…`. */
+  area: string;
   postedWithin: string;
   sort: string;
   page: string;
@@ -80,6 +88,7 @@ export function parseFilters(
     cities: parseListParam(params, "city"),
     source: str("source"),
     radiusMiles: amount("radius_miles"),
+    area: parseArea(str("area")) ? str("area") : "",
     postedWithin: POSTED_WITHIN_OPTIONS.some((o) => o.value === str("posted_within"))
       ? str("posted_within")
       : "",
@@ -243,6 +252,7 @@ export function buildFilterQueryString(
   if (f.minSqft) next.set("min_sqft", f.minSqft);
   if (f.source) next.set("source", f.source);
   if (f.radiusMiles) next.set("radius_miles", f.radiusMiles);
+  if (f.area) next.set("area", f.area);
   if (f.postedWithin) next.set("posted_within", f.postedWithin);
   if (f.sort && f.sort !== "newest") next.set("sort", f.sort);
   if (f.page && f.page !== "1") next.set("page", f.page);
@@ -260,6 +270,7 @@ export function hasActiveFilters(f: ListingFilters): boolean {
       f.minSqft ||
       f.source ||
       f.radiusMiles ||
+      f.area ||
       f.postedWithin ||
       f.cities.length ||
       f.neighborhoods.length,
@@ -268,33 +279,78 @@ export function hasActiveFilters(f: ListingFilters): boolean {
 
 type QueryFactory = () => QueryLike;
 
-/** Radius is applied in JS after the query, so facets need it passed separately. */
-export type RadiusScope = { miles: string; locations: SearchLocation[] };
+/**
+ * Radius and drawn area are applied in JS after the query (Postgres has no
+ * geo index here), so every place that lists matches needs them passed in.
+ */
+export type GeoScope = {
+  radius?: { miles: string; locations: SearchLocation[] };
+  area?: Coordinates[];
+};
+
+export function hasGeoScope(scope: GeoScope): boolean {
+  return Boolean(scope.radius || scope.area);
+}
+
+/** Only rows with a map pin inside the drawn area's bounding box can match. */
+export function narrowToGeoScope(query: QueryLike, scope: GeoScope): QueryLike {
+  if (!hasGeoScope(scope)) return query;
+  query = query.not("latitude", "is", null).not("longitude", "is", null);
+  if (scope.area) {
+    const box = polygonBounds(scope.area);
+    query = query
+      .gte("latitude", box.minLat)
+      .lte("latitude", box.maxLat)
+      .gte("longitude", box.minLng)
+      .lte("longitude", box.maxLng);
+  }
+  return query;
+}
+
+export function filterByGeoScope<T extends Pick<ListingRow, "latitude" | "longitude" | "city" | "state">>(
+  rows: T[],
+  scope: GeoScope,
+): T[] {
+  let out = rows;
+  if (scope.radius) {
+    out = filterByRadius(out as unknown as ListingRow[], scope.radius.miles, scope.radius.locations) as unknown as T[];
+  }
+  if (scope.area) {
+    const area = scope.area;
+    out = out.filter(
+      (row) =>
+        row.latitude != null &&
+        row.longitude != null &&
+        pointInPolygon({ lat: row.latitude, lng: row.longitude }, area),
+    );
+  }
+  return out;
+}
 
 async function fetchDistinctNeighborhoodPairs(
   buildQuery: QueryFactory,
-  radius?: RadiusScope,
-): Promise<Array<{ city: string; neighborhood: string }>> {
-  const pairs = new Map<string, { city: string; neighborhood: string }>();
+  scope: GeoScope = {},
+): Promise<Array<{ city: string; neighborhood: string; count: number }>> {
+  const pairs = new Map<string, { city: string; neighborhood: string; count: number }>();
   const pageSize = 1000;
   let offset = 0;
+  const geo = hasGeoScope(scope);
 
   while (true) {
     let q = buildQuery()
-      .select(radius ? "city, state, neighborhood, latitude, longitude" : "city, neighborhood")
+      .select(geo ? "city, state, neighborhood, latitude, longitude" : "city, neighborhood")
       .order("id");
-    q = q.not("neighborhood", "is", null);
-    if (radius) q = q.not("latitude", "is", null);
+    q = narrowToGeoScope(q.not("neighborhood", "is", null), scope);
     const { data, error } = await q.range(offset, offset + pageSize - 1);
     if (error) throw error;
     if (!data?.length) break;
-    const rows = radius
-      ? filterByRadius(data as ListingRow[], radius.miles, radius.locations)
-      : data;
+    const rows = geo ? filterByGeoScope(data as ListingRow[], scope) : data;
     for (const row of rows) {
       if (!row.city || !row.neighborhood) continue;
       const key = `${row.city}\0${row.neighborhood}`;
-      pairs.set(key, { city: row.city, neighborhood: row.neighborhood });
+      const existing = pairs.get(key);
+      if (existing) existing.count += 1;
+      else pairs.set(key, { city: row.city, neighborhood: row.neighborhood, count: 1 });
     }
     if (data.length < pageSize) break;
     offset += pageSize;
@@ -332,9 +388,9 @@ async function fetchDistinctColumn(
 export async function fetchDistinctNeighborhoods(
   buildQuery: QueryFactory,
   activeCities: string[] = [],
-  radius?: RadiusScope,
+  scope: GeoScope = {},
 ): Promise<NeighborhoodOption[]> {
-  const pairs = await fetchDistinctNeighborhoodPairs(buildQuery, radius);
+  const pairs = await fetchDistinctNeighborhoodPairs(buildQuery, scope);
   return buildNeighborhoodOptions(pairs, activeCities);
 }
 
