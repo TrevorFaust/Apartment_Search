@@ -5,6 +5,8 @@ import { CityMultiSelect, NeighborhoodMultiSelect } from "./filter-multi-selects
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { FilterForm } from "./filter-form";
 import { LinkPending } from "./link-pending";
+import { PageStrip } from "./page-strip";
+import { SOURCE_OPTIONS } from "@/lib/sources";
 import {
   applyListingFilters,
   applyListingSort,
@@ -34,17 +36,6 @@ const TABS = [
   { id: "favorites", label: "Favorites" },
   { id: "hidden", label: "Hidden" },
 ] as const;
-
-const SOURCE_OPTIONS = [
-  { value: "", label: "All" },
-  { value: "craigslist", label: "Craigslist" },
-  { value: "apartments_com", label: "Apartments.com" },
-  { value: "seattle_rentals", label: "SeattleRentals" },
-  { value: "chicago_rentals", label: "ChicagoRentals" },
-  { value: "chicago_apartment_finders", label: "ChicagoApartmentFinders" },
-  { value: "urban_abodes", label: "UrbanAbodes" },
-  { value: "domu", label: "Domu" },
-];
 
 export default async function ListingsPage({
   searchParams,
@@ -179,28 +170,25 @@ export default async function ListingsPage({
     return qs ? `/?${qs}` : "/";
   };
 
-  const pageHref = (p: number) => {
-    const qs = buildFilterQueryString(filters, { page: String(p) });
-    return qs ? `/?${qs}` : "/";
-  };
-
   return (
     <div className="rise">
-      <div className="mb-6 flex flex-wrap items-center gap-1.5 border-b border-line pb-4">
-        {TABS.map((t) => (
-          <Link
-            key={t.id}
-            href={tabHref(t.id)}
-            aria-current={filters.tab === t.id ? "page" : undefined}
-            className={`press px-4 py-1.5 text-sm ${
-              filters.tab === t.id
-                ? "bg-ink text-bg-elevated hover:bg-accent-dim"
-                : "border border-ink/20 hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
-            }`}
-          >
-            <LinkPending>{t.label}</LinkPending>
-          </Link>
-        ))}
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-1 rounded-full border border-line/70 bg-bg-elevated/70 p-1 shadow-soft">
+          {TABS.map((t) => (
+            <Link
+              key={t.id}
+              href={tabHref(t.id)}
+              aria-current={filters.tab === t.id ? "page" : undefined}
+              className={`press rounded-full px-4 py-1.5 text-sm ${
+                filters.tab === t.id
+                  ? "bg-ink text-bg-elevated shadow-soft hover:bg-accent-dim"
+                  : "text-ink-soft hover:bg-accent-wash hover:text-accent-dim"
+              }`}
+            >
+              <LinkPending>{t.label}</LinkPending>
+            </Link>
+          ))}
+        </div>
         <div className="ml-auto flex flex-wrap items-center gap-4">
           <span className="font-display text-sm italic text-ink-soft">
             {totalCount === 0
@@ -220,7 +208,7 @@ export default async function ListingsPage({
 
       <FilterForm
         id={FORM_ID}
-        className="mb-3 grid grid-cols-2 gap-3 border border-line bg-bg-deep/50 p-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+        className="mb-3 grid grid-cols-2 gap-3 rounded-3xl border border-line/70 bg-bg-elevated/60 p-5 shadow-soft sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
       >
         {filters.tab !== "all" && (
           <input type="hidden" name="tab" value={filters.tab} />
@@ -276,34 +264,34 @@ export default async function ListingsPage({
         <button
           suppressHydrationWarning
           type="submit"
-          className="press self-end border border-ink bg-ink px-4 py-1.5 text-sm text-bg-elevated hover:border-accent hover:bg-accent hover:shadow-[3px_3px_0_0_var(--color-accent-dim)] group-aria-busy:cursor-progress group-aria-busy:opacity-60"
+          className="press self-end rounded-full bg-ink px-5 py-2 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow group-aria-busy:cursor-progress group-aria-busy:opacity-60"
         >
           <span className="group-aria-busy:hidden">Filter</span>
           <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
         </button>
       </FilterForm>
 
-      <p className="mb-8 text-[11px] text-ink-faint">
+      <p className="mb-8 pl-2 text-[11px] text-ink-faint">
         {`Only listings posted in the last ${MAX_LISTING_AGE_DAYS} days that are still online. `}
         Each one is re-checked daily and dropped once it&apos;s taken down.
       </p>
 
       {radiusActive && !hasRadius && (
-        <p className="mb-4 border border-dashed border-ink/30 p-3 text-xs text-ink-soft">
+        <p className="mb-4 rounded-2xl border border-dashed border-ink/25 p-4 text-xs text-ink-soft">
           Radius needs at least one city selected, with a geocoded downtown center.
           Save Preferences to geocode city centers, then pick that city here.
         </p>
       )}
 
       {hasRadius && listings.length === 0 && totalCount === 0 && (
-        <p className="mb-4 border border-dashed border-ink/30 p-3 text-xs text-ink-soft">
+        <p className="mb-4 rounded-2xl border border-dashed border-ink/25 p-4 text-xs text-ink-soft">
           No listings within {filters.radiusMiles} mi. Listings may lack
           coordinates yet — run <code>npm run scrape</code> to geocode them.
         </p>
       )}
 
       {totalCount === 0 ? (
-        <div className="border border-dashed border-ink/30 p-16 text-center">
+        <div className="rounded-3xl border border-dashed border-ink/25 bg-bg-elevated/40 p-16 text-center">
           <p className="font-display text-2xl italic text-ink-soft">
             Nothing here yet.
           </p>
@@ -321,30 +309,11 @@ export default async function ListingsPage({
           </div>
 
           {totalPages > 1 && (
-            <nav
-              className="mt-8 flex flex-wrap items-center justify-center gap-2 border-t border-line pt-6"
-              aria-label="Pagination"
-            >
-              {safePage > 1 ? (
-                <Link href={pageHref(safePage - 1)} className={PAGER_LINK}>
-                  <LinkPending>← Prev</LinkPending>
-                </Link>
-              ) : (
-                <span className={PAGER_DISABLED}>← Prev</span>
-              )}
-
-              <span className="px-3 text-sm text-ink-soft">
-                Page {safePage} of {totalPages}
-              </span>
-
-              {safePage < totalPages ? (
-                <Link href={pageHref(safePage + 1)} className={PAGER_LINK}>
-                  <LinkPending>Next →</LinkPending>
-                </Link>
-              ) : (
-                <span className={PAGER_DISABLED}>Next →</span>
-              )}
-            </nav>
+            <PageStrip
+              current={safePage}
+              total={totalPages}
+              query={buildFilterQueryString(filters, { page: "1" })}
+            />
           )}
         </>
       )}
@@ -352,14 +321,9 @@ export default async function ListingsPage({
   );
 }
 
-const PAGER_LINK =
-  "press border border-ink/25 bg-bg-elevated px-4 py-1.5 text-sm hover:border-accent hover:bg-accent-wash hover:text-accent-dim hover:shadow-[3px_3px_0_0_var(--color-accent)]";
-const PAGER_DISABLED =
-  "cursor-not-allowed border border-ink/10 px-4 py-1.5 text-sm text-ink-faint";
-
 function LoadError({ message }: { message: string }) {
   return (
-    <p className="border border-ink/40 bg-bg-deep p-4 text-sm text-ink">
+    <p className="rounded-2xl border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
       Couldn&apos;t load listings: {message}
     </p>
   );
@@ -380,7 +344,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
-      {label}
+      <span className="pl-1">{label}</span>
       <input
         suppressHydrationWarning
         name={name}

@@ -16,13 +16,20 @@ import { scrapeUrbanAbodes } from "./sources/urbanAbodes.js";
 
 import { scrapeDomu } from "./sources/domu.js";
 
-import { loadPreferences, storeListings, recordRun } from "./supabase.js";
+import {
+  borrowBuildingPhotos,
+  loadPreferences,
+  recordRun,
+  storeListings,
+} from "./supabase.js";
 
 import { matchesPreferences } from "./filter.js";
 
 import { sendNewsletter } from "./email.js";
 
 import { checkListingsStillOnline } from "./liveness.js";
+
+import { sendSubscriberDigests } from "./digests.js";
 
 import type { BrowserContext } from "playwright";
 
@@ -166,7 +173,7 @@ async function main() {
 
   console.log(
 
-    `Preferences: locations=${locations.map((l) => `${l.city}-${l.state}`).join(", ")}, price=${prefs.min_price ?? "-"}..${prefs.max_price ?? "-"}, beds=${prefs.min_beds ?? "-"}..${prefs.max_beds ?? "-"}, radius=${prefs.radius_miles ?? "none"}`,
+    `Preferences: locations=${locations.map((l) => `${l.city}-${l.state}`).join(", ")}, price=${prefs.min_price ?? "-"}..${prefs.max_price ?? "-"}, beds>=${prefs.min_beds ?? "-"}, radius=${prefs.radius_miles ?? "none"}`,
 
   );
 
@@ -215,6 +222,25 @@ async function main() {
     console.error("Availability check failed:", err);
 
     runError = `${runError ? runError + "; " : ""}liveness: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
+  try {
+    const borrowed = await borrowBuildingPhotos();
+    console.log(`Borrowed building photos for ${borrowed} photo-less units`);
+  } catch (err) {
+    console.error(err);
+  }
+
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const digests = await sendSubscriberDigests();
+      console.log(
+        `Subscriber digests: ${digests.due} due, ${digests.sent} sent, ${digests.failed} failed`,
+      );
+    } catch (err) {
+      console.error("Subscriber digests failed:", err);
+      runError = `${runError ? runError + "; " : ""}digests: ${err instanceof Error ? err.message : String(err)}`;
+    }
 
   }
 
@@ -242,6 +268,20 @@ async function main() {
 
     console.log(`Newsletter sent to ${emailTo} with ${matching.length} listings.`);
 
+  }
+
+  if (!process.env.RESEND_API_KEY) {
+    console.log("RESEND_API_KEY not configured — skipping subscriber digests.");
+    return;
+  }
+  try {
+    const digests = await sendSubscriberDigests();
+    console.log(
+      `Subscriber digests: ${digests.due} due, ${digests.sent} sent, ${digests.failed} failed`,
+    );
+  } catch (err) {
+    console.error("Subscriber digests failed:", err);
+    runError = `${runError ? runError + "; " : ""}digests: ${err instanceof Error ? err.message : String(err)}`;
   }
 
 }

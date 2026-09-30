@@ -121,7 +121,7 @@ export function LocationsEditor({
               className="field-control normal-case tracking-normal"
             />
             {activeRow === index && suggestions.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto border border-line bg-bg-elevated shadow-[3px_3px_0_0_var(--color-accent)]">
+              <ul className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-48 overflow-y-auto rounded-2xl border border-line/80 bg-bg-elevated p-1.5 normal-case tracking-normal shadow-lift">
                 {suggestions.map((s) => (
                   <li key={`${s.city}-${s.state}`}>
                     <button
@@ -129,7 +129,7 @@ export function LocationsEditor({
                       suppressHydrationWarning
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pickSuggestion(index, s)}
-                      className="block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-accent-dim"
+                      className="block w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-accent-dim"
                     >
                       {formatCityOption(s)}
                     </button>
@@ -160,7 +160,7 @@ export function LocationsEditor({
               type="button"
               suppressHydrationWarning
               onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
-              className="press border border-ink/25 px-2 py-1.5 text-xs text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
+              className="press rounded-full border border-ink/15 px-3 py-2 text-xs text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
             >
               Remove
             </button>
@@ -171,7 +171,7 @@ export function LocationsEditor({
         type="button"
         suppressHydrationWarning
         onClick={() => setRows((prev) => [...prev, { city: "", state: "" }])}
-        className="press border border-dashed border-ink/30 px-3 py-1.5 text-xs text-ink-soft hover:border-solid hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+        className="press rounded-full border border-dashed border-ink/25 px-4 py-1.5 text-xs text-ink-soft hover:border-solid hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
       >
         + Add location
       </button>

@@ -1,6 +1,7 @@
 "use client";
 
 import type { NeighborhoodOption } from "@/lib/neighborhoods";
+import { titleCase } from "@/lib/sources";
 import { MultiSelectFilter } from "./multi-select-filter";
 
 export function NeighborhoodMultiSelect({
@@ -32,7 +33,7 @@ export function CityMultiSelect({
     <MultiSelectFilter
       name="city"
       label="City"
-      options={options}
+      options={options.map((city) => ({ value: city, label: titleCase(city) }))}
       selected={selected}
       emptyLabel="Any city"
     />

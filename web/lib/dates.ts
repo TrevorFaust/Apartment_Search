@@ -30,6 +30,27 @@ export function formatRelative(iso: string, now: number): string {
   return shortDate.format(new Date(iso));
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"];
+
+const monthDay = new Intl.DateTimeFormat("en-US", {
+  month: "numeric",
+  day: "numeric",
+  timeZone: TIME_ZONE,
+});
+
+function ordinal(n: number): string {
+  if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
+
+/** "Sept 19th" */
+export function formatMonthDay(iso: string): string {
+  const parts = monthDay.formatToParts(new Date(iso));
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  return `${MONTHS[month - 1]} ${ordinal(day)}`;
+}
+
 export function formatFull(iso: string): string {
   return fullDate.format(new Date(iso));
 }

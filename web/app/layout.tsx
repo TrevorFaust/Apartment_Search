@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, Libre_Franklin } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
+import { getViewer } from "@/lib/auth";
 import { LinkPending } from "./link-pending";
 import "./globals.css";
 
@@ -22,13 +23,14 @@ export const metadata: Metadata = {
   applicationName: "Lease Locator",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const viewer = await getViewer();
   return (
     <html lang="en">
       <body className={`${fraunces.variable} ${franklin.variable} min-h-screen`}>
-        <header className="border-b-4 border-double border-ink/70 bg-bg">
+        <header className="rounded-b-[2.5rem] border-b border-line/70 bg-bg shadow-soft">
           <div className="mx-auto max-w-5xl px-6 pt-6 pb-4">
             <p className="text-[11px] uppercase tracking-[0.35em] text-accent">
               Scraped fresh, every morning
@@ -50,13 +52,22 @@ export default function RootLayout({
                   />
                 </Link>
               </h1>
-              <nav className="flex gap-1.5 pb-1 text-sm">
+              <nav className="flex flex-wrap items-center gap-1.5 pb-1 text-sm">
                 <Link href="/" className={NAV_LINK}>
                   <LinkPending>Listings</LinkPending>
                 </Link>
                 <Link href="/preferences" className={NAV_LINK}>
-                  <LinkPending>Preferences</LinkPending>
+                  <LinkPending>Scraper settings</LinkPending>
                 </Link>
+                {viewer ? (
+                  <Link href="/account" className={NAV_CTA} title={viewer.email}>
+                    <LinkPending>My alerts</LinkPending>
+                  </Link>
+                ) : (
+                  <Link href="/signin" className={NAV_CTA}>
+                    <LinkPending>Sign in</LinkPending>
+                  </Link>
+                )}
               </nav>
             </div>
           </div>
@@ -72,4 +83,6 @@ export default function RootLayout({
 }
 
 const NAV_LINK =
-  "press border border-ink/30 px-4 py-1.5 hover:border-ink hover:bg-ink hover:text-bg-elevated hover:shadow-[3px_3px_0_0_var(--color-accent)]";
+  "press rounded-full border border-ink/15 bg-bg-elevated/60 px-4 py-1.5 hover:border-ink hover:bg-ink hover:text-bg-elevated hover:shadow-soft";
+const NAV_CTA =
+  "press rounded-full bg-accent px-4 py-1.5 text-bg-elevated shadow-glow hover:bg-accent-dim";

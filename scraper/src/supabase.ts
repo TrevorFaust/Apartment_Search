@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Preferences, ScrapedListing } from "./types.js";
+import { cleanImageUrl } from "./images.js";
 import { normalizeLocations } from "./types.js";
 import {
   buildListingGeocodeQuery,
@@ -132,6 +133,7 @@ export async function storeListings(
     const cached = existingCoords.get(`${l.source}:${l.externalId}`);
     const latitude = l.latitude ?? cached?.lat ?? null;
     const longitude = l.longitude ?? cached?.lng ?? null;
+    const imageUrl = cleanImageUrl(l.imageUrl);
     return {
       source: l.source,
       external_id: l.externalId,
@@ -151,7 +153,7 @@ export async function storeListings(
       last_seen_at: now,
       is_active: true,
       // Omitted when unknown so a re-scrape never wipes a back-filled value.
-      ...(l.imageUrl ? { image_url: l.imageUrl } : {}),
+      ...(imageUrl ? { image_url: imageUrl } : {}),
       ...(l.postedAt ? { posted_at: l.postedAt } : {}),
     };
   });
@@ -177,14 +179,20 @@ export async function storeListings(
     const row = rows.find(
       (r) => r.source === l.source && r.external_id === l.externalId,
     );
-    return row
-      ? {
-          ...l,
-          latitude: row.latitude,
-          longitude: row.longitude,
-        }
-      : l;
+    return {
+      ...l,
+      imageUrl: cleanImageUrl(l.imageUrl),
+      latitude: row?.latitude ?? l.latitude,
+      longitude: row?.longitude ?? l.longitude,
+    };
   });
+}
+
+/** Gives photo-less units a photo from another unit in the same building. */
+export async function borrowBuildingPhotos(): Promise<number> {
+  const { data, error } = await supabase.rpc("borrow_building_photos");
+  if (error) throw new Error(`Failed to borrow building photos: ${error.message}`);
+  return (data as number) ?? 0;
 }
 
 export async function recordRun(run: {

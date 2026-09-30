@@ -1,8 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { Dropdown, OPTION_ROW } from "./dropdown";
+
 type Option = { value: string; label: string };
 
-/** A select that applies its form as soon as the choice changes. */
+/** A single-choice dropdown that applies its form as soon as the choice changes. */
 export function AutoSubmitSelect({
   label,
   name,
@@ -18,27 +22,47 @@ export function AutoSubmitSelect({
   form?: string;
   inline?: boolean;
 }) {
+  const [value, setValue] = useState(defaultValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
+  const current = options.find((o) => o.value === value) ?? options[0];
+
+  const choose = (next: string) => {
+    if (next === value) return;
+    flushSync(() => setValue(next));
+    inputRef.current?.form?.requestSubmit();
+  };
+
   return (
-    <label
-      className={`flex text-[10px] uppercase tracking-widest text-ink-soft ${
-        inline ? "items-center gap-2" : "flex-col gap-1"
-      }`}
-    >
-      {label}
-      <select
-        suppressHydrationWarning
-        name={name}
-        form={form}
-        defaultValue={defaultValue}
-        onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="field-control normal-case tracking-normal"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <>
+      <input ref={inputRef} type="hidden" name={name} value={value} form={form} />
+      <Dropdown label={label} summary={current?.label} inline={inline}>
+        {(close) =>
+          options.map((o) => {
+            const selected = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => {
+                  close();
+                  choose(o.value);
+                }}
+                className={`${OPTION_ROW} ${selected ? "font-medium text-accent-dim" : ""}`}
+              >
+                <span className={`size-1.5 shrink-0 rounded-full ${selected ? "bg-accent" : "bg-transparent"}`} />
+                {o.label}
+              </button>
+            );
+          })
+        }
+      </Dropdown>
+    </>
   );
 }

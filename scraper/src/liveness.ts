@@ -1,12 +1,14 @@
 import { FETCH_UA, sleep } from "./fetch.js";
+import { cleanImageUrl } from "./images.js";
 import { supabase } from "./supabase.js";
 
 /** Listings older than this drop off the site and are no longer checked. */
 export const MAX_LISTING_AGE_DAYS = 60;
 
 const DEFAULT_BUDGET = 600;
-const CONCURRENCY = 3;
-const DELAY_MS = 300;
+// ~1.5 requests/sec. Craigslist rate-limits (and IP-blocks) anything much faster.
+const CONCURRENCY = 2;
+const DELAY_MS = 1000;
 /** Stop hitting a host for the rest of the run after this many blocked/errored responses in a row. */
 const HOST_FAILURE_LIMIT = 8;
 
@@ -79,7 +81,7 @@ function parseOgImage(html: string): string | null {
   const m =
     html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i) ??
     html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
-  return m?.[1]?.startsWith("http") ? m[1] : null;
+  return cleanImageUrl(m?.[1]?.replace(/&amp;/g, "&"));
 }
 
 function parseCraigslistPostedAt(html: string): string | null {
@@ -164,7 +166,7 @@ export async function checkListingsStillOnline(
           if (verdict.postedAt && !candidate.posted_at) {
             update.posted_at = verdict.postedAt;
           }
-          if (verdict.imageUrl && !candidate.image_url?.startsWith("http")) {
+          if (verdict.imageUrl && !cleanImageUrl(candidate.image_url)) {
             update.image_url = verdict.imageUrl;
           }
         }

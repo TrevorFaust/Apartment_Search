@@ -2,6 +2,7 @@ import { supabaseAdmin, normalizeLocations, type PreferencesRow } from "@/lib/su
 import { savePreferences } from "../actions";
 import { LocationsEditor } from "../locations-editor";
 import { MultiSelectFilter } from "../multi-select-filter";
+import { titleCase } from "@/lib/sources";
 import {
   applyListingFilters,
   fetchDistinctNeighborhoods,
@@ -19,7 +20,7 @@ export default async function PreferencesPage() {
 
   if (error) {
     return (
-      <p className="border border-ink/40 bg-bg-deep p-4 text-sm text-ink">
+      <p className="rounded-2xl border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
         Couldn&apos;t load preferences: {error.message}
       </p>
     );
@@ -64,16 +65,16 @@ export default async function PreferencesPage() {
   return (
     <div className="rise mx-auto max-w-2xl">
       <h2 className="font-display text-3xl font-semibold">
-        Search <span className="italic font-normal text-accent">preferences</span>
+        Scraper <span className="italic font-normal text-accent">settings</span>
       </h2>
       <p className="mt-1 mb-8 text-sm text-ink-soft">
-        These drive the scraper&apos;s search areas, radius filter, and which
-        new listings make it into your daily newsletter.
+        These drive the scraper&apos;s search areas, radius filter, and the
+        owner&apos;s daily newsletter. For your own email alerts, use My alerts.
       </p>
 
       <form
         action={savePreferences}
-        className="space-y-6 border border-line bg-bg-elevated p-6 shadow-[4px_4px_0_0_var(--color-line)]"
+        className="space-y-6 rounded-3xl border border-line/70 bg-bg-elevated p-7 shadow-soft"
       >
         <Section title="Where">
           <LocationsEditor initialLocations={locations} />
@@ -95,7 +96,7 @@ export default async function PreferencesPage() {
                   .filter((l) => l.center_lat != null && l.center_lng != null)
                   .map((l) => (
                     <li key={`${l.city}-${l.state}`}>
-                      {titleCaseCity(l.city)}, {l.state.toUpperCase()} center:{" "}
+                      {titleCase(l.city)}, {l.state.toUpperCase()} center:{" "}
                       {l.center_lat!.toFixed(4)}, {l.center_lng!.toFixed(4)}
                     </li>
                   ))}
@@ -123,7 +124,6 @@ export default async function PreferencesPage() {
             <Field label="Max rent $" name="max_price" type="number" defaultValue={prefs.max_price ?? ""} />
             <Field label="Min sqft" name="min_sqft" type="number" defaultValue={prefs.min_sqft ?? ""} />
             <Field label="Min beds" name="min_beds" type="number" step="1" defaultValue={prefs.min_beds ?? ""} hint="0 = studio ok" />
-            <Field label="Max beds" name="max_beds" type="number" step="1" defaultValue={prefs.max_beds ?? ""} />
             <Field label="Min baths" name="min_baths" type="number" step="0.5" defaultValue={prefs.min_baths ?? ""} />
           </div>
         </Section>
@@ -150,24 +150,13 @@ export default async function PreferencesPage() {
         <button
           suppressHydrationWarning
           type="submit"
-          className="press w-full border border-ink bg-ink py-2.5 text-sm uppercase tracking-[0.2em] text-bg-elevated hover:border-accent hover:bg-accent hover:shadow-[4px_4px_0_0_var(--color-accent-dim)]"
+          className="press w-full rounded-full bg-ink py-3 text-sm uppercase tracking-[0.2em] text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow"
         >
           Save preferences
         </button>
       </form>
     </div>
   );
-}
-
-function titleCaseCity(city: string): string {
-  return city
-    .split(/([\s-]+)/)
-    .map((part) =>
-      /^[\s-]+$/.test(part)
-        ? part
-        : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase(),
-    )
-    .join("");
 }
 
 function Section({
@@ -179,7 +168,7 @@ function Section({
 }) {
   return (
     <fieldset>
-      <legend className="mb-3 border-b border-line pb-1 font-display text-lg italic text-ink-soft w-full">
+      <legend className="mb-3 w-full font-display text-lg italic text-ink-soft">
         {title}
       </legend>
       {children}

@@ -17,7 +17,6 @@ const prefs: Preferences = {
   min_price: null,
   max_price: 3000,
   min_beds: null,
-  max_beds: null,
   min_baths: null,
   min_sqft: null,
   neighborhoods: [],

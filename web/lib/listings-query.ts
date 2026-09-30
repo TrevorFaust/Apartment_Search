@@ -19,12 +19,12 @@ export const PAGE_SIZE = 50;
 export const MAX_LISTING_AGE_DAYS = 60;
 
 export const POSTED_WITHIN_OPTIONS = [
-  { value: "", label: "Last 2 months" },
   { value: "1", label: "24 hours" },
   { value: "3", label: "3 days" },
   { value: "7", label: "Week" },
   { value: "14", label: "2 weeks" },
   { value: "30", label: "Month" },
+  { value: "", label: "2 months" },
 ] as const;
 
 export const SORT_OPTIONS = [

@@ -16,8 +16,6 @@ export async function scrapeCraigslist(
   if (prefs.max_price != null) params.set("max_price", String(prefs.max_price));
   if (prefs.min_beds != null && prefs.min_beds > 0)
     params.set("min_bedrooms", String(Math.floor(prefs.min_beds)));
-  if (prefs.max_beds != null)
-    params.set("max_bedrooms", String(Math.ceil(prefs.max_beds)));
   if (prefs.min_baths != null && prefs.min_baths > 0)
     params.set("min_bathrooms", String(Math.floor(prefs.min_baths)));
   if (prefs.min_sqft != null) params.set("minSqft", String(prefs.min_sqft));
@@ -109,9 +107,9 @@ export async function scrapeCraigslist(
         state: location.state,
         latitude: null,
         longitude: null,
-        // Off-screen gallery images are 1x1 data: placeholders until scrolled
-        // into view; the liveness check back-fills the real photo instead.
-        imageUrl: i.imageUrl?.startsWith("http") ? i.imageUrl : null,
+        // Off-screen gallery images are 1x1 data: stubs; storeListings drops
+        // them and the liveness check back-fills the real photo.
+        imageUrl: i.imageUrl,
         amenities: [],
         postedAt: null,
       }));

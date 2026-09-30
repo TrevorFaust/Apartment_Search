@@ -12,22 +12,61 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 const MAX_LISTINGS_IN_EMAIL = 50;
+const DEFAULT_FROM = "Lease Locator <onboarding@resend.dev>";
+
+export type EmailListing = Pick<
+  ScrapedListing,
+  | "source"
+  | "url"
+  | "title"
+  | "price"
+  | "bedrooms"
+  | "bathrooms"
+  | "sqft"
+  | "neighborhood"
+  | "address"
+  | "imageUrl"
+>;
 
 export async function sendNewsletter(
-  listings: ScrapedListing[],
+  listings: EmailListing[],
   to: string,
 ): Promise<void> {
+  await sendListingsEmail({
+    to,
+    listings,
+    kicker: "Daily Apartment Digest",
+    subtitle: "new in the last 24 hours",
+  });
+}
+
+export async function sendListingsEmail({
+  to,
+  listings,
+  kicker,
+  subtitle,
+  manageUrl,
+  unsubscribeUrl,
+}: {
+  to: string;
+  listings: EmailListing[];
+  kicker: string;
+  subtitle: string;
+  manageUrl?: string;
+  unsubscribeUrl?: string;
+}): Promise<void> {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const date = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
+    timeZone: "America/Los_Angeles",
   });
 
   const shown = listings.slice(0, MAX_LISTINGS_IN_EMAIL);
   const overflow = listings.length - shown.length;
 
-  const bySource = new Map<string, ScrapedListing[]>();
+  const bySource = new Map<string, EmailListing[]>();
   for (const l of shown) {
     const key = SOURCE_LABELS[l.source] ?? l.source;
     bySource.set(key, [...(bySource.get(key) ?? []), l]);
@@ -36,35 +75,45 @@ export async function sendNewsletter(
   const sections = [...bySource.entries()]
     .map(
       ([label, items]) => `
-      <h2 style="font-size:16px;color:#1a1a1a;border-bottom:2px solid #e8e4dc;padding-bottom:8px;margin:28px 0 4px;">
-        ${label} <span style="color:#999;font-weight:normal;">(${items.length})</span>
+      <h2 style="font-size:15px;color:#1a1c18;margin:28px 0 4px;font-weight:600;">
+        ${label} <span style="color:#6f7468;font-weight:normal;">(${items.length})</span>
       </h2>
       ${items.map(renderListing).join("")}`,
     )
     .join("");
 
+  const links = [
+    manageUrl ? `<a href="${manageUrl}" style="color:#3d6f5f;">Edit your alerts</a>` : "",
+    unsubscribeUrl ? `<a href="${unsubscribeUrl}" style="color:#3d6f5f;">Unsubscribe</a>` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const html = `
-  <div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;margin:0 auto;padding:24px;background:#faf8f4;">
-    <p style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#8a8378;margin:0;">Daily Apartment Digest</p>
-    <h1 style="font-size:24px;color:#1a1a1a;margin:4px 0 0;">${listings.length} new listing${listings.length === 1 ? "" : "s"}</h1>
-    <p style="font-size:13px;color:#8a8378;margin:4px 0 0;">${date} · new in the last 24 hours</p>
+  <div style="font-family:Georgia,'Times New Roman',serif;max-width:600px;margin:0 auto;padding:28px;background:#e6e3db;border-radius:24px;">
+    <p style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#3d6f5f;margin:0;">${kicker}</p>
+    <h1 style="font-size:24px;color:#1a1c18;margin:6px 0 0;">${listings.length} new listing${listings.length === 1 ? "" : "s"}</h1>
+    <p style="font-size:13px;color:#6f7468;margin:4px 0 0;">${date} · ${subtitle}</p>
     ${sections}
-    ${overflow > 0 ? `<p style="font-size:13px;color:#8a8378;">…and ${overflow} more in the web app.</p>` : ""}
-    <p style="font-size:11px;color:#b5aea2;margin-top:32px;border-top:1px solid #e8e4dc;padding-top:12px;">
-      Sent by Lease Locator. Sources: Craigslist, Apartments.com, SeattleRentals.
+    ${overflow > 0 ? `<p style="font-size:13px;color:#6f7468;">…and ${overflow} more on the site.</p>` : ""}
+    <p style="font-size:11px;color:#6f7468;margin-top:32px;border-top:1px solid #cfc9bc;padding-top:12px;">
+      Sent by Lease Locator.${links ? ` ${links}` : ""}
     </p>
   </div>`;
 
   const { error } = await resend.emails.send({
-    from: "Lease Locator <onboarding@resend.dev>",
+    from: process.env.EMAIL_FROM || DEFAULT_FROM,
     to,
     subject: `🏠 ${listings.length} new apartment${listings.length === 1 ? "" : "s"} — ${date}`,
     html,
+    ...(unsubscribeUrl
+      ? { headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` } }
+      : {}),
   });
   if (error) throw new Error(`Resend error: ${error.message}`);
 }
 
-function renderListing(l: ScrapedListing): string {
+function renderListing(l: EmailListing): string {
   const facts = [
     l.price != null ? `$${l.price.toLocaleString()}/mo` : null,
     l.bedrooms != null ? (l.bedrooms === 0 ? "Studio" : `${l.bedrooms} bd`) : null,
@@ -76,19 +125,19 @@ function renderListing(l: ScrapedListing): string {
     .join(" · ");
 
   return `
-  <table style="width:100%;margin:12px 0;background:#ffffff;border:1px solid #e8e4dc;border-radius:6px;" cellpadding="0" cellspacing="0">
+  <table style="width:100%;margin:12px 0;background:#efece5;border-radius:18px;" cellpadding="0" cellspacing="0">
     <tr>
       ${
         l.imageUrl
-          ? `<td style="width:110px;padding:10px;vertical-align:top;">
-               <img src="${l.imageUrl}" width="100" height="75" style="object-fit:cover;border-radius:4px;display:block;" alt="" />
+          ? `<td style="width:116px;padding:10px;vertical-align:top;">
+               <img src="${l.imageUrl}" width="104" height="78" style="object-fit:cover;border-radius:12px;display:block;" alt="" />
              </td>`
           : ""
       }
-      <td style="padding:10px;vertical-align:top;">
-        <a href="${l.url}" style="font-size:15px;color:#1a4d8f;text-decoration:none;font-weight:bold;">${escapeHtml(l.title)}</a>
-        <p style="font-size:13px;color:#555;margin:6px 0 0;">${facts}</p>
-        ${l.address ? `<p style="font-size:12px;color:#999;margin:4px 0 0;">${escapeHtml(l.address)}</p>` : ""}
+      <td style="padding:12px;vertical-align:top;">
+        <a href="${l.url}" style="font-size:15px;color:#2f5649;text-decoration:none;font-weight:bold;">${escapeHtml(l.title)}</a>
+        <p style="font-size:13px;color:#4a4e45;margin:6px 0 0;">${escapeHtml(facts)}</p>
+        ${l.address ? `<p style="font-size:12px;color:#6f7468;margin:4px 0 0;">${escapeHtml(l.address)}</p>` : ""}
       </td>
     </tr>
   </table>`;

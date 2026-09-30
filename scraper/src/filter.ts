@@ -31,19 +31,7 @@ function listingWithinConfiguredRadius(
  * than silently drop a good apartment).
  */
 export function matchesPreferences(l: ScrapedListing, prefs: Preferences): boolean {
-  if (prefs.min_price != null && l.price != null && l.price < prefs.min_price) return false;
-  if (prefs.max_price != null && l.price != null && l.price > prefs.max_price) return false;
-  if (prefs.min_beds != null && l.bedrooms != null && l.bedrooms < prefs.min_beds) return false;
-  if (prefs.max_beds != null && l.bedrooms != null && l.bedrooms > prefs.max_beds) return false;
-  if (prefs.min_baths != null && l.bathrooms != null && l.bathrooms < prefs.min_baths) return false;
-  if (prefs.min_sqft != null && l.sqft != null && l.sqft < prefs.min_sqft) return false;
-
-  if (prefs.neighborhoods.length > 0 && l.neighborhood) {
-    const ok = prefs.neighborhoods.some((pref) =>
-      prefNeighborhoodMatches(l, pref),
-    );
-    if (!ok) return false;
-  }
+  if (!matchesCriteria(l, prefs)) return false;
 
   if (prefs.keywords.length > 0) {
     const haystack = [l.title, ...(l.amenities ?? [])].join(" ").toLowerCase();
@@ -56,8 +44,37 @@ export function matchesPreferences(l: ScrapedListing, prefs: Preferences): boole
   return true;
 }
 
+export type Criteria = {
+  min_price: number | null;
+  max_price: number | null;
+  min_beds: number | null;
+  min_baths: number | null;
+  min_sqft: number | null;
+  neighborhoods: string[];
+};
+
+type MatchableListing = Pick<
+  ScrapedListing,
+  "price" | "bedrooms" | "bathrooms" | "sqft" | "neighborhood" | "city"
+>;
+
+/** Price/size/neighborhood checks shared by the owner newsletter and subscriber digests. */
+export function matchesCriteria(l: MatchableListing, c: Criteria): boolean {
+  if (c.min_price != null && l.price != null && l.price < c.min_price) return false;
+  if (c.max_price != null && l.price != null && l.price > c.max_price) return false;
+  if (c.min_beds != null && l.bedrooms != null && l.bedrooms < c.min_beds) return false;
+  if (c.min_baths != null && l.bathrooms != null && l.bathrooms < c.min_baths) return false;
+  if (c.min_sqft != null && l.sqft != null && l.sqft < c.min_sqft) return false;
+
+  if (c.neighborhoods.length > 0 && l.neighborhood) {
+    const ok = c.neighborhoods.some((pref) => prefNeighborhoodMatches(l, pref));
+    if (!ok) return false;
+  }
+  return true;
+}
+
 function prefNeighborhoodMatches(
-  listing: ScrapedListing,
+  listing: MatchableListing,
   pref: string,
 ): boolean {
   const hood = listing.neighborhood?.toLowerCase() ?? "";

@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-function requireEnv(name: string): string {
+export function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required env var: ${name}`);
   return value;
@@ -56,7 +56,6 @@ export interface PreferencesRow {
   min_price: number | null;
   max_price: number | null;
   min_beds: number | null;
-  max_beds: number | null;
   min_baths: number | null;
   min_sqft: number | null;
   neighborhoods: string[];

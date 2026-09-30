@@ -97,7 +97,7 @@ export async function savePreferences(formData: FormData) {
       min_price: num("min_price"),
       max_price: num("max_price"),
       min_beds: num("min_beds"),
-      max_beds: num("max_beds"),
+      max_beds: null,
       min_baths: num("min_baths"),
       min_sqft: num("min_sqft"),
       neighborhoods,

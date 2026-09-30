@@ -42,7 +42,6 @@ export interface Preferences {
   min_price: number | null;
   max_price: number | null;
   min_beds: number | null;
-  max_beds: number | null;
   min_baths: number | null;
   min_sqft: number | null;
   neighborhoods: string[];

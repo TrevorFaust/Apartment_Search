@@ -135,14 +135,7 @@ function buildFilterSegment(prefs: Preferences): string {
   const parts: string[] = [];
 
   const minBeds = prefs.min_beds != null ? Math.floor(prefs.min_beds) : null;
-  const maxBeds = prefs.max_beds != null ? Math.ceil(prefs.max_beds) : null;
-  if (minBeds === 0 && (maxBeds === 0 || maxBeds == null)) {
-    parts.push("studios");
-  } else if (minBeds != null && maxBeds != null && minBeds === maxBeds) {
-    parts.push(`${minBeds}-bedrooms`);
-  } else if (minBeds != null && maxBeds != null) {
-    parts.push(`${minBeds}-to-${maxBeds}-bedrooms`);
-  } else if (minBeds != null && minBeds > 0) {
+  if (minBeds != null && minBeds > 0) {
     parts.push(`min-${minBeds}-bedrooms`);
   }
 
