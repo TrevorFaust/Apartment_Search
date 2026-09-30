@@ -60,7 +60,7 @@ export function AlertsForm({
           name="max_price"
           choices={BUDGET_CHOICES}
           defaultValue={values.maxPrice}
-          exact={exact ? { label: "Exact", prefix: "$", step: 50, max: 50000 } : undefined}
+          exact={exact ? { label: "Exact", prefix: "$", max: 50000 } : undefined}
         />
       </Step>
 
@@ -78,7 +78,7 @@ export function AlertsForm({
           name="min_baths"
           choices={BATH_CHOICES}
           defaultValue={values.minBaths}
-          exact={exact ? { label: "At least", suffix: "baths", step: 0.5, max: 10 } : undefined}
+          exact={exact ? { label: "At least", suffix: "baths", decimals: true, max: 10 } : undefined}
         />
       </Step>
 
@@ -87,7 +87,7 @@ export function AlertsForm({
           name="min_sqft"
           choices={SIZE_CHOICES}
           defaultValue={values.minSqft}
-          exact={exact ? { label: "At least", suffix: "sqft", step: 25, max: 20000 } : undefined}
+          exact={exact ? { label: "At least", suffix: "sqft", max: 20000 } : undefined}
         />
       </Step>
 

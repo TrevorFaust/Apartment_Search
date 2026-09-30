@@ -1,4 +1,5 @@
 import type { ListingRow, SearchLocation } from "./supabase";
+import { parseAmount } from "./amounts";
 import { withinRadiusMiles } from "./geo";
 import {
   buildNeighborhoodOptions,
@@ -68,16 +69,17 @@ export function parseFilters(
 ): ListingFilters {
   const str = (k: string) =>
     typeof params[k] === "string" ? (params[k] as string) : "";
+  const amount = (k: string) => (parseAmount(str(k)) == null ? "" : str(k));
 
   return {
     tab: str("tab") || "all",
-    maxPrice: str("max_price"),
-    beds: str("beds"),
-    minSqft: str("min_sqft"),
+    maxPrice: amount("max_price"),
+    beds: amount("beds"),
+    minSqft: amount("min_sqft"),
     neighborhoods: parseListParam(params, "neighborhood"),
     cities: parseListParam(params, "city"),
     source: str("source"),
-    radiusMiles: str("radius_miles"),
+    radiusMiles: amount("radius_miles"),
     postedWithin: POSTED_WITHIN_OPTIONS.some((o) => o.value === str("posted_within"))
       ? str("posted_within")
       : "",

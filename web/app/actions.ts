@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { geocodeCityCenter } from "@/lib/geocode";
 import { redirect } from "next/navigation";
+import { parseAmount } from "@/lib/amounts";
 import { getViewer, isOwner } from "@/lib/auth";
 import { setMark } from "@/lib/marks";
 import { supabaseAdmin, type SearchLocation } from "@/lib/supabase";
@@ -65,12 +66,7 @@ async function attachCityCenters(
 export async function savePreferences(formData: FormData) {
   if (!isOwner(await getViewer())) redirect("/account");
 
-  const num = (name: string): number | null => {
-    const v = formData.get(name);
-    if (v == null || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
+  const num = (name: string) => parseAmount(formData.get(name));
 
   const neighborhoods = formData
     .getAll("neighborhoods")

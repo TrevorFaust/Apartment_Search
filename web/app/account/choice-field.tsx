@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { cleanAmount } from "@/lib/amounts";
 import type { Choice } from "@/lib/subscribers";
 
 /**
@@ -16,7 +17,7 @@ export function ChoiceField({
   name: string;
   choices: Choice[];
   defaultValue: string;
-  exact?: { label: string; prefix?: string; suffix?: string; step?: number; max?: number };
+  exact?: { label: string; prefix?: string; suffix?: string; decimals?: boolean; max?: number };
 }) {
   const [value, setValue] = useState(defaultValue);
   const [custom, setCustom] = useState(() =>
@@ -58,15 +59,15 @@ export function ChoiceField({
           {exact.prefix && <span>{exact.prefix}</span>}
           <input
             suppressHydrationWarning
-            type="number"
-            inputMode="decimal"
-            min={0}
-            max={exact.max}
-            step={exact.step ?? 1}
+            type="text"
+            inputMode={exact.decimals ? "decimal" : "numeric"}
+            autoComplete="off"
             value={custom}
             onChange={(e) => {
-              setCustom(e.target.value);
-              setValue(e.target.value);
+              const next = cleanAmount(e.target.value, exact.decimals);
+              if (exact.max != null && Number(next) > exact.max) return;
+              setCustom(next);
+              setValue(next);
             }}
             placeholder="—"
             className="w-20 rounded-full bg-bg-elevated px-2 py-1 text-sm tabular-nums outline-none"

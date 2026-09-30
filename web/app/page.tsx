@@ -231,19 +231,16 @@ export default async function ListingsPage({
           label="Max $"
           name="max_price"
           defaultValue={filters.maxPrice}
-          type="number"
         />
         <FilterInput
           label="Beds ≥"
           name="beds"
           defaultValue={filters.beds}
-          type="number"
         />
         <FilterInput
           label="Sqft ≥"
           name="min_sqft"
           defaultValue={filters.minSqft}
-          type="number"
         />
         <AutoSubmitSelect
           label="Posted within"
@@ -261,7 +258,7 @@ export default async function ListingsPage({
           label="Radius (mi)"
           name="radius_miles"
           defaultValue={filters.radiusMiles}
-          type="number"
+          decimals
           hint="from downtown; pick a city first"
         />
         <AutoSubmitSelect

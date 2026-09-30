@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { parseAmount } from "@/lib/amounts";
 import { getViewer, supabaseUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getSubscriber, parseAlertLocations, type Frequency } from "@/lib/subscribers";
@@ -73,12 +74,7 @@ export async function saveAlerts(formData: FormData) {
   const viewer = await getViewer();
   if (!viewer) redirect("/signin");
 
-  const num = (name: string): number | null => {
-    const v = formData.get(name);
-    if (v == null || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
+  const num = (name: string) => parseAmount(formData.get(name));
   const list = (name: string) =>
     formData.getAll(name).map((v) => String(v).trim()).filter(Boolean);
 

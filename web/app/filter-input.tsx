@@ -2,20 +2,21 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { cleanAmount } from "@/lib/amounts";
 import { FieldLabel, submitClosestForm } from "./dropdown";
 
-/** Browse-filter text/number input with a × that clears it and re-applies filters. */
+/** Browse-filter amount box (typed only, never negative) with a × that clears it and re-applies filters. */
 export function FilterInput({
   label,
   name,
   defaultValue,
-  type = "text",
+  decimals = false,
   hint,
 }: {
   label: string;
   name: string;
   defaultValue: string;
-  type?: string;
+  decimals?: boolean;
   hint?: string;
 }) {
   const [value, setValue] = useState(defaultValue);
@@ -46,9 +47,11 @@ export function FilterInput({
         id={inputId}
         suppressHydrationWarning
         name={name}
-        type={type}
+        type="text"
+        inputMode={decimals ? "decimal" : "numeric"}
+        autoComplete="off"
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => setValue(cleanAmount(e.target.value, decimals))}
         className="field-control"
       />
       {hint && <span className="pl-1 text-[10px] text-ink-faint">{hint}</span>}

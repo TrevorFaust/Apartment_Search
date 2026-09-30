@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getViewer, isOwner } from "@/lib/auth";
 import { supabaseAdmin, normalizeLocations, type PreferencesRow } from "@/lib/supabase";
 import { savePreferences } from "../actions";
+import { AmountInput } from "../amount-input";
 import { LocationsEditor } from "../locations-editor";
 import { MultiSelectFilter } from "../multi-select-filter";
 import { titleCase } from "@/lib/sources";
@@ -89,8 +90,7 @@ export default async function PreferencesPage() {
           <Field
             label="Radius (miles)"
             name="radius_miles"
-            type="number"
-            step="1"
+            amount="decimal"
             defaultValue={prefs.radius_miles ?? ""}
             hint="Distance from downtown of each search city. Blank = no limit. Re-save after changing cities."
           />
@@ -125,11 +125,11 @@ export default async function PreferencesPage() {
 
         <Section title="Budget & size">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <Field label="Min rent $" name="min_price" type="number" defaultValue={prefs.min_price ?? ""} />
-            <Field label="Max rent $" name="max_price" type="number" defaultValue={prefs.max_price ?? ""} />
-            <Field label="Min sqft" name="min_sqft" type="number" defaultValue={prefs.min_sqft ?? ""} />
-            <Field label="Min beds" name="min_beds" type="number" step="1" defaultValue={prefs.min_beds ?? ""} hint="0 = studio ok" />
-            <Field label="Min baths" name="min_baths" type="number" step="0.5" defaultValue={prefs.min_baths ?? ""} />
+            <Field label="Min rent $" name="min_price" amount="whole" defaultValue={prefs.min_price ?? ""} />
+            <Field label="Max rent $" name="max_price" amount="whole" defaultValue={prefs.max_price ?? ""} />
+            <Field label="Min sqft" name="min_sqft" amount="whole" defaultValue={prefs.min_sqft ?? ""} />
+            <Field label="Min beds" name="min_beds" amount="whole" defaultValue={prefs.min_beds ?? ""} hint="0 = studio ok" />
+            <Field label="Min baths" name="min_baths" amount="decimal" defaultValue={prefs.min_baths ?? ""} />
           </div>
         </Section>
 
@@ -187,26 +187,35 @@ function Field({
   defaultValue,
   hint,
   type = "text",
-  step,
+  amount,
 }: {
   label: string;
   name: string;
   defaultValue: string | number;
   hint?: string;
   type?: string;
-  step?: string;
+  /** Typed-only, non-negative number box. */
+  amount?: "whole" | "decimal";
 }) {
   return (
     <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
       {label}
-      <input
-        suppressHydrationWarning
-        name={name}
-        type={type}
-        step={step}
-        defaultValue={defaultValue}
-        className="field-control normal-case tracking-normal"
-      />
+      {amount ? (
+        <AmountInput
+          name={name}
+          defaultValue={String(defaultValue)}
+          decimals={amount === "decimal"}
+          className="field-control normal-case tracking-normal"
+        />
+      ) : (
+        <input
+          suppressHydrationWarning
+          name={name}
+          type={type}
+          defaultValue={defaultValue}
+          className="field-control normal-case tracking-normal"
+        />
+      )}
       {hint && (
         <span className="text-[10px] normal-case tracking-normal text-ink-faint">
           {hint}
