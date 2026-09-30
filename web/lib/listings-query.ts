@@ -15,6 +15,28 @@ type QueryLike = any;
 
 export const PAGE_SIZE = 50;
 
+/** Keep in sync with MAX_LISTING_AGE_DAYS in scraper/src/liveness.ts. */
+export const MAX_LISTING_AGE_DAYS = 60;
+
+export const POSTED_WITHIN_OPTIONS = [
+  { value: "", label: "Last 2 months" },
+  { value: "1", label: "24 hours" },
+  { value: "3", label: "3 days" },
+  { value: "7", label: "Week" },
+  { value: "14", label: "2 weeks" },
+  { value: "30", label: "Month" },
+] as const;
+
+export const SORT_OPTIONS = [
+  { value: "newest", label: "Newest posted", column: "listed_at", ascending: false },
+  { value: "oldest", label: "Oldest posted", column: "listed_at", ascending: true },
+  { value: "price_asc", label: "Price: low → high", column: "price", ascending: true },
+  { value: "price_desc", label: "Price: high → low", column: "price", ascending: false },
+  { value: "sqft_desc", label: "Size: largest", column: "sqft", ascending: false },
+  { value: "sqft_asc", label: "Size: smallest", column: "sqft", ascending: true },
+  { value: "beds_desc", label: "Most bedrooms", column: "bedrooms", ascending: false },
+] as const;
+
 export type ListingFilters = {
   tab: string;
   minPrice: string;
@@ -25,6 +47,8 @@ export type ListingFilters = {
   cities: string[];
   source: string;
   radiusMiles: string;
+  postedWithin: string;
+  sort: string;
   page: string;
 };
 
@@ -56,8 +80,24 @@ export function parseFilters(
     cities: parseListParam(params, "city"),
     source: str("source"),
     radiusMiles: str("radius_miles"),
+    postedWithin: POSTED_WITHIN_OPTIONS.some((o) => o.value === str("posted_within"))
+      ? str("posted_within")
+      : "",
+    sort: SORT_OPTIONS.some((o) => o.value === str("sort")) ? str("sort") : "newest",
     page: str("page") || "1",
   };
+}
+
+export function applyListingSort(query: QueryLike, sort: string): QueryLike {
+  const option = SORT_OPTIONS.find((o) => o.value === sort) ?? SORT_OPTIONS[0];
+  query = query.order(option.column, {
+    ascending: option.ascending,
+    nullsFirst: false,
+  });
+  if (option.column !== "listed_at") {
+    query = query.order("listed_at", { ascending: false });
+  }
+  return query.order("id");
 }
 
 export function parsePage(page: string | undefined): number {
@@ -86,6 +126,7 @@ export function applyListingFilters(
   options?: {
     includeNeighborhoodFilter?: boolean;
     includeCityFilter?: boolean;
+    includeFreshnessFilter?: boolean;
     select?: string;
   },
 ): QueryLike {
@@ -98,17 +139,26 @@ export function applyListingFilters(
   const includeCity = options?.includeCityFilter !== false;
   const { tab } = filters;
 
+  // Saved listings stay visible past the age limit (flagged on the card if
+  // gone); everything else must be recent and still online.
+  if (tab !== "favorites" && options?.includeFreshnessFilter !== false) {
+    query = query
+      .eq("is_active", true)
+      .gte("listed_at", daysAgoIso(MAX_LISTING_AGE_DAYS));
+  }
+
   if (tab === "hidden") {
     query = query.eq("is_hidden", true);
   } else {
     query = query.eq("is_hidden", false);
     if (tab === "new") {
-      query = query.gte(
-        "first_seen_at",
-        new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-      );
+      query = query.gte("first_seen_at", daysAgoIso(1));
     }
     if (tab === "favorites") query = query.eq("is_favorite", true);
+  }
+
+  if (filters.postedWithin) {
+    query = query.gte("listed_at", daysAgoIso(Number(filters.postedWithin)));
   }
 
   if (filters.minPrice) query = query.gte("price", Number(filters.minPrice));
@@ -128,9 +178,14 @@ export function applyListingFilters(
       return `neighborhood.ilike.${pattern}`;
     });
     query = query.or(clauses.join(","));
-  }  if (filters.source) query = query.eq("source", filters.source);
+  }
+  if (filters.source) query = query.eq("source", filters.source);
 
   return query;
+}
+
+function daysAgoIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 export function filterByRadius(
@@ -179,6 +234,8 @@ export function buildFilterQueryString(
   if (f.minSqft) next.set("min_sqft", f.minSqft);
   if (f.source) next.set("source", f.source);
   if (f.radiusMiles) next.set("radius_miles", f.radiusMiles);
+  if (f.postedWithin) next.set("posted_within", f.postedWithin);
+  if (f.sort && f.sort !== "newest") next.set("sort", f.sort);
   if (f.page && f.page !== "1") next.set("page", f.page);
   for (const c of f.cities) next.append("city", c);
   for (const n of f.neighborhoods) next.append("neighborhood", n);

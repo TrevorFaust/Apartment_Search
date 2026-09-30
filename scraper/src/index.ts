@@ -22,6 +22,8 @@ import { matchesPreferences } from "./filter.js";
 
 import { sendNewsletter } from "./email.js";
 
+import { checkListingsStillOnline } from "./liveness.js";
+
 import type { BrowserContext } from "playwright";
 
 import type { ScrapedListing, SearchLocation } from "./types.js";
@@ -195,6 +197,26 @@ async function main() {
   newCount = newListings.length;
 
   console.log(`Stored ${all.length} listings, ${newCount} new`);
+
+
+
+  try {
+
+    const check = await checkListingsStillOnline();
+
+    console.log(
+
+      `Availability check: ${check.checked} checked, ${check.gone} gone, ${check.unknown} inconclusive`,
+
+    );
+
+  } catch (err) {
+
+    console.error("Availability check failed:", err);
+
+    runError = `${runError ? runError + "; " : ""}liveness: ${err instanceof Error ? err.message : String(err)}`;
+
+  }
 
 
 

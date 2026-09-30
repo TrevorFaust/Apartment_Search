@@ -19,7 +19,7 @@ export default async function PreferencesPage() {
 
   if (error) {
     return (
-      <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
+      <p className="border border-ink/40 bg-bg-deep p-4 text-sm text-ink">
         Couldn&apos;t load preferences: {error.message}
       </p>
     );
@@ -36,7 +36,12 @@ export default async function PreferencesPage() {
       applyListingFilters(
         supabaseAdmin().from("listings"),
         parseFilters({ city: cities }),
-        { includeCityFilter: true, includeNeighborhoodFilter: false, select: "id" },
+        {
+          includeCityFilter: true,
+          includeNeighborhoodFilter: false,
+          includeFreshnessFilter: false,
+          select: "id",
+        },
       );
     neighborhoodOptions = await fetchDistinctNeighborhoods(
       buildFacetQuery,
@@ -59,7 +64,7 @@ export default async function PreferencesPage() {
   return (
     <div className="rise mx-auto max-w-2xl">
       <h2 className="font-display text-3xl font-semibold">
-        Search <span className="italic font-normal text-rust">preferences</span>
+        Search <span className="italic font-normal text-accent">preferences</span>
       </h2>
       <p className="mt-1 mb-8 text-sm text-ink-soft">
         These drive the scraper&apos;s search areas, radius filter, and which
@@ -68,7 +73,7 @@ export default async function PreferencesPage() {
 
       <form
         action={savePreferences}
-        className="space-y-6 border border-line bg-paper p-6 shadow-[4px_4px_0_0_var(--color-line)]"
+        className="space-y-6 border border-line bg-bg-elevated p-6 shadow-[4px_4px_0_0_var(--color-line)]"
       >
         <Section title="Where">
           <LocationsEditor initialLocations={locations} />
@@ -145,7 +150,7 @@ export default async function PreferencesPage() {
         <button
           suppressHydrationWarning
           type="submit"
-          className="w-full border border-ink bg-ink py-2.5 text-sm uppercase tracking-[0.2em] text-paper transition-colors hover:border-rust hover:bg-rust"
+          className="press w-full border border-ink bg-ink py-2.5 text-sm uppercase tracking-[0.2em] text-bg-elevated hover:border-accent hover:bg-accent hover:shadow-[4px_4px_0_0_var(--color-accent-dim)]"
         >
           Save preferences
         </button>
@@ -206,7 +211,7 @@ function Field({
         type={type}
         step={step}
         defaultValue={defaultValue}
-        className="border border-ink/30 bg-paper px-2 py-1.5 text-sm normal-case tracking-normal text-ink focus:border-rust focus:outline-none"
+        className="field-control normal-case tracking-normal"
       />
       {hint && (
         <span className="text-[10px] normal-case tracking-normal text-ink-faint">

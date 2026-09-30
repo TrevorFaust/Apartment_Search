@@ -118,10 +118,10 @@ export function LocationsEditor({
               name={`apt-hunt-city-${index}`}
               data-1p-ignore
               data-lpignore="true"
-              className="border border-ink/30 bg-paper px-2 py-1.5 text-sm normal-case tracking-normal text-ink focus:border-rust focus:outline-none"
+              className="field-control normal-case tracking-normal"
             />
             {activeRow === index && suggestions.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto border border-line bg-paper shadow-[3px_3px_0_0_var(--color-line)]">
+              <ul className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto border border-line bg-bg-elevated shadow-[3px_3px_0_0_var(--color-accent)]">
                 {suggestions.map((s) => (
                   <li key={`${s.city}-${s.state}`}>
                     <button
@@ -129,7 +129,7 @@ export function LocationsEditor({
                       suppressHydrationWarning
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pickSuggestion(index, s)}
-                      className="block w-full px-3 py-2 text-left text-sm hover:bg-paper-deep"
+                      className="block w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-accent-dim"
                     >
                       {formatCityOption(s)}
                     </button>
@@ -152,7 +152,7 @@ export function LocationsEditor({
               name={`apt-hunt-state-${index}`}
               data-1p-ignore
               data-lpignore="true"
-              className="border border-ink/30 bg-paper px-2 py-1.5 text-sm uppercase tracking-normal text-ink focus:border-rust focus:outline-none"
+              className="field-control uppercase tracking-normal"
             />
           </label>
           {rows.length > 1 && (
@@ -160,7 +160,7 @@ export function LocationsEditor({
               type="button"
               suppressHydrationWarning
               onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
-              className="border border-ink/25 px-2 py-1.5 text-xs text-ink-soft hover:border-rust hover:text-rust"
+              className="press border border-ink/25 px-2 py-1.5 text-xs text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
             >
               Remove
             </button>
@@ -171,7 +171,7 @@ export function LocationsEditor({
         type="button"
         suppressHydrationWarning
         onClick={() => setRows((prev) => [...prev, { city: "", state: "" }])}
-        className="border border-dashed border-ink/30 px-3 py-1.5 text-xs text-ink-soft hover:border-ink hover:text-ink"
+        className="press border border-dashed border-ink/30 px-3 py-1.5 text-xs text-ink-soft hover:border-solid hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
       >
         + Add location
       </button>

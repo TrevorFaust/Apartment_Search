@@ -2,22 +2,31 @@ import Link from "next/link";
 import { supabaseAdmin, type ListingRow, type SearchLocation } from "@/lib/supabase";
 import { ListingCard } from "./listing-card";
 import { CityMultiSelect, NeighborhoodMultiSelect } from "./filter-multi-selects";
+import { AutoSubmitSelect } from "./auto-submit-select";
+import { FilterForm } from "./filter-form";
+import { LinkPending } from "./link-pending";
 import {
   applyListingFilters,
+  applyListingSort,
   buildFilterQueryString,
   buildRadiusCenters,
   fetchDistinctCities,
   fetchDistinctNeighborhoods,
   distinctNeighborhoodOptionsFromListings,
   filterByRadius,
+  MAX_LISTING_AGE_DAYS,
   PAGE_SIZE,
   parseFilters,
   parsePage,
+  POSTED_WITHIN_OPTIONS,
+  SORT_OPTIONS,
 } from "@/lib/listings-query";
 
 export const dynamic = "force-dynamic";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
+
+const FORM_ID = "listing-filters";
 
 const TABS = [
   { id: "all", label: "All" },
@@ -25,6 +34,17 @@ const TABS = [
   { id: "favorites", label: "Favorites" },
   { id: "hidden", label: "Hidden" },
 ] as const;
+
+const SOURCE_OPTIONS = [
+  { value: "", label: "All" },
+  { value: "craigslist", label: "Craigslist" },
+  { value: "apartments_com", label: "Apartments.com" },
+  { value: "seattle_rentals", label: "SeattleRentals" },
+  { value: "chicago_rentals", label: "ChicagoRentals" },
+  { value: "chicago_apartment_finders", label: "ChicagoApartmentFinders" },
+  { value: "urban_abodes", label: "UrbanAbodes" },
+  { value: "domu", label: "Domu" },
+];
 
 export default async function ListingsPage({
   searchParams,
@@ -34,6 +54,7 @@ export default async function ListingsPage({
   const params = await searchParams;
   const filters = parseFilters(params);
   const page = parsePage(filters.page);
+  const now = Date.now();
 
   // Preferences only supply geocoded city centers for optional radius — not browse filters.
   const { data: prefsData } = await supabaseAdmin()
@@ -88,19 +109,13 @@ export default async function ListingsPage({
   let totalCount = 0;
 
   if (hasRadius) {
-    const { data, error } = await applyListingFilters(
-      supabaseAdmin().from("listings").select("*"),
-      filters,
-    )
-      .order("first_seen_at", { ascending: false })
-      .limit(10000);
+    const { data, error } = await applyListingSort(
+      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters),
+      filters.sort,
+    ).limit(10000);
 
     if (error) {
-      return (
-        <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
-          Couldn&apos;t load listings: {error.message}
-        </p>
-      );
+      return <LoadError message={error.message} />;
     }
 
     const allFiltered = filterByRadius(
@@ -120,11 +135,7 @@ export default async function ListingsPage({
     );
 
     if (countError) {
-      return (
-        <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
-          Couldn&apos;t load listings: {countError.message}
-        </p>
-      );
+      return <LoadError message={countError.message} />;
     }
 
     totalCount = count ?? 0;
@@ -132,19 +143,13 @@ export default async function ListingsPage({
     const safePage = Math.min(page, totalPages);
     const offset = (safePage - 1) * PAGE_SIZE;
 
-    const { data, error } = await applyListingFilters(
-      supabaseAdmin().from("listings").select("*"),
-      filters,
-    )
-      .order("first_seen_at", { ascending: false })
-      .range(offset, offset + PAGE_SIZE - 1);
+    const { data, error } = await applyListingSort(
+      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters),
+      filters.sort,
+    ).range(offset, offset + PAGE_SIZE - 1);
 
     if (error) {
-      return (
-        <p className="border border-rust bg-paper-deep p-4 text-sm text-rust-deep">
-          Couldn&apos;t load listings: {error.message}
-        </p>
-      );
+      return <LoadError message={error.message} />;
     }
 
     listings = (data ?? []) as ListingRow[];
@@ -181,28 +186,42 @@ export default async function ListingsPage({
 
   return (
     <div className="rise">
-      <div className="mb-6 flex flex-wrap items-center gap-1 border-b border-line pb-4">
+      <div className="mb-6 flex flex-wrap items-center gap-1.5 border-b border-line pb-4">
         {TABS.map((t) => (
           <Link
             key={t.id}
             href={tabHref(t.id)}
-            className={`px-4 py-1.5 text-sm transition-colors ${
+            aria-current={filters.tab === t.id ? "page" : undefined}
+            className={`press px-4 py-1.5 text-sm ${
               filters.tab === t.id
-                ? "bg-ink text-paper"
-                : "border border-ink/20 hover:border-ink/60"
+                ? "bg-ink text-bg-elevated hover:bg-accent-dim"
+                : "border border-ink/20 hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
             }`}
           >
-            {t.label}
+            <LinkPending>{t.label}</LinkPending>
           </Link>
         ))}
-        <span className="ml-auto font-display text-sm italic text-ink-soft">
-          {totalCount === 0
-            ? "0 listings"
-            : `Showing ${showingFrom}–${showingTo} of ${totalCount}`}
-        </span>
+        <div className="ml-auto flex flex-wrap items-center gap-4">
+          <span className="font-display text-sm italic text-ink-soft">
+            {totalCount === 0
+              ? "0 listings"
+              : `Showing ${showingFrom}–${showingTo} of ${totalCount}`}
+          </span>
+          <AutoSubmitSelect
+            label="Sort"
+            name="sort"
+            form={FORM_ID}
+            defaultValue={filters.sort}
+            options={SORT_OPTIONS}
+            inline
+          />
+        </div>
       </div>
 
-      <form className="mb-8 grid grid-cols-2 gap-3 border border-line bg-paper-deep/60 p-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <FilterForm
+        id={FORM_ID}
+        className="mb-3 grid grid-cols-2 gap-3 border border-line bg-bg-deep/50 p-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+      >
         {filters.tab !== "all" && (
           <input type="hidden" name="tab" value={filters.tab} />
         )}
@@ -230,6 +249,12 @@ export default async function ListingsPage({
           defaultValue={filters.minSqft}
           type="number"
         />
+        <AutoSubmitSelect
+          label="Posted within"
+          name="posted_within"
+          defaultValue={filters.postedWithin}
+          options={POSTED_WITHIN_OPTIONS}
+        />
         <CityMultiSelect options={cityOptions} selected={filters.cities} />
         <NeighborhoodMultiSelect
           options={neighborhoodOptions}
@@ -242,32 +267,26 @@ export default async function ListingsPage({
           type="number"
           hint="optional — pick a city first; uses downtown centers from Preferences"
         />
-        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
-          Source
-          <select
-            suppressHydrationWarning
-            name="source"
-            defaultValue={filters.source}
-            className="border border-ink/30 bg-paper px-2 py-1.5 text-sm text-ink focus:border-rust focus:outline-none"
-          >
-            <option value="">All</option>
-            <option value="craigslist">Craigslist</option>
-            <option value="apartments_com">Apartments.com</option>
-            <option value="seattle_rentals">SeattleRentals</option>
-            <option value="chicago_rentals">ChicagoRentals</option>
-            <option value="chicago_apartment_finders">ChicagoApartmentFinders</option>
-            <option value="urban_abodes">UrbanAbodes</option>
-            <option value="domu">Domu</option>
-          </select>
-        </label>
+        <AutoSubmitSelect
+          label="Source"
+          name="source"
+          defaultValue={filters.source}
+          options={SOURCE_OPTIONS}
+        />
         <button
           suppressHydrationWarning
           type="submit"
-          className="self-end border border-ink bg-ink px-4 py-1.5 text-sm text-paper transition-colors hover:bg-rust hover:border-rust xl:col-span-1"
+          className="press self-end border border-ink bg-ink px-4 py-1.5 text-sm text-bg-elevated hover:border-accent hover:bg-accent hover:shadow-[3px_3px_0_0_var(--color-accent-dim)] group-aria-busy:cursor-progress group-aria-busy:opacity-60"
         >
-          Filter
+          <span className="group-aria-busy:hidden">Filter</span>
+          <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
         </button>
-      </form>
+      </FilterForm>
+
+      <p className="mb-8 text-[11px] text-ink-faint">
+        {`Only listings posted in the last ${MAX_LISTING_AGE_DAYS} days that are still online. `}
+        Each one is re-checked daily and dropped once it&apos;s taken down.
+      </p>
 
       {radiusActive && !hasRadius && (
         <p className="mb-4 border border-dashed border-ink/30 p-3 text-xs text-ink-soft">
@@ -289,15 +308,15 @@ export default async function ListingsPage({
             Nothing here yet.
           </p>
           <p className="mt-2 text-sm text-ink-faint">
-            Run the scraper (<code>npm run scrape</code>) or wait for the next
-            daily run.
+            Try widening the filters. New listings arrive with each morning&apos;s
+            scrape.
           </p>
         </div>
       ) : (
         <>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {listings.map((l, i) => (
-              <ListingCard key={l.id} listing={l} index={i} />
+              <ListingCard key={l.id} listing={l} index={i} now={now} />
             ))}
           </div>
 
@@ -307,16 +326,11 @@ export default async function ListingsPage({
               aria-label="Pagination"
             >
               {safePage > 1 ? (
-                <Link
-                  href={pageHref(safePage - 1)}
-                  className="border border-ink/25 px-4 py-1.5 text-sm transition-colors hover:border-ink hover:bg-paper-deep"
-                >
-                  ← Prev
+                <Link href={pageHref(safePage - 1)} className={PAGER_LINK}>
+                  <LinkPending>← Prev</LinkPending>
                 </Link>
               ) : (
-                <span className="border border-ink/10 px-4 py-1.5 text-sm text-ink-faint">
-                  ← Prev
-                </span>
+                <span className={PAGER_DISABLED}>← Prev</span>
               )}
 
               <span className="px-3 text-sm text-ink-soft">
@@ -324,22 +338,30 @@ export default async function ListingsPage({
               </span>
 
               {safePage < totalPages ? (
-                <Link
-                  href={pageHref(safePage + 1)}
-                  className="border border-ink/25 px-4 py-1.5 text-sm transition-colors hover:border-ink hover:bg-paper-deep"
-                >
-                  Next →
+                <Link href={pageHref(safePage + 1)} className={PAGER_LINK}>
+                  <LinkPending>Next →</LinkPending>
                 </Link>
               ) : (
-                <span className="border border-ink/10 px-4 py-1.5 text-sm text-ink-faint">
-                  Next →
-                </span>
+                <span className={PAGER_DISABLED}>Next →</span>
               )}
             </nav>
           )}
         </>
       )}
     </div>
+  );
+}
+
+const PAGER_LINK =
+  "press border border-ink/25 bg-bg-elevated px-4 py-1.5 text-sm hover:border-accent hover:bg-accent-wash hover:text-accent-dim hover:shadow-[3px_3px_0_0_var(--color-accent)]";
+const PAGER_DISABLED =
+  "cursor-not-allowed border border-ink/10 px-4 py-1.5 text-sm text-ink-faint";
+
+function LoadError({ message }: { message: string }) {
+  return (
+    <p className="border border-ink/40 bg-bg-deep p-4 text-sm text-ink">
+      Couldn&apos;t load listings: {message}
+    </p>
   );
 }
 
@@ -364,7 +386,7 @@ function Field({
         name={name}
         type={type}
         defaultValue={defaultValue}
-        className="border border-ink/30 bg-paper px-2 py-1.5 text-sm text-ink focus:border-rust focus:outline-none"
+        className="field-control normal-case tracking-normal"
       />
       {hint && (
         <span className="text-[10px] normal-case tracking-normal text-ink-faint">

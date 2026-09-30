@@ -2,7 +2,12 @@
 
 Personal apartment-hunting pipeline: scrapes listings once a day, stores them
 in Supabase, emails you a newsletter of anything new in the last 24 hours, and
-gives you a small web app to browse, filter, and favorite listings.
+gives you a small web app to browse, filter, sort, and favorite listings.
+
+The list is meant for finding overlooked gems, not an ever-growing archive:
+only listings posted in the last **60 days** that are **still online** show up.
+Each card shows when it was posted (when the source says), when it was added
+here, and when it was last verified as still available.
 
 ## Sources
 
@@ -77,11 +82,41 @@ seen before counts as new and gets emailed.
 3. The workflow runs every day at 15:00 UTC (7/8am Pacific). You can also
    trigger it manually from the Actions tab ("Run workflow").
 
+> GitHub pauses scheduled workflows after 60 days without repo activity. If
+> listings stop updating, re-enable it with
+> `gh workflow enable "Daily apartment scrape"`.
+
 ## How dedupe works
 
 Each listing is keyed by `(source, external_id)`. Re-scraped listings update
 `last_seen_at` but keep their original `first_seen_at`, favorite, and hidden
 flags. A listing is "new" if that key has never been seen before.
+
+## Freshness and availability checks
+
+- `listed_at` is the source's real posted date when known, otherwise the date
+  the listing was first pulled. Anything older than 60 days drops off the site
+  (Favorites keep showing, flagged if the listing is gone).
+- After each scrape, an availability check re-visits up to 600 listings
+  (least recently checked first). A 404/410, a redirect to the site's
+  homepage, or Craigslist's "deleted/expired" notice marks the listing
+  inactive and hides it. Blocked or erroring requests never hide anything.
+- The same check back-fills Craigslist's real posted date and photo, which
+  the search page doesn't expose.
+- Apartments.com is skipped (its bot protection makes checks inconclusive).
+
+Run the check on its own (e.g. with a bigger budget) with:
+
+```bash
+LIVENESS_BUDGET=3000 npm run check-listings
+```
+
+## Browsing
+
+Filter by price, beds, size, city, neighborhood, radius, source, and how
+recently a listing was posted (24 hours to 2 months). Sort by newest/oldest
+posted, price, size, or bedrooms. Colors follow the shared palette used across
+my other sites (warm gray `#e6e3db` base, forest green `#3d6f5f` accent).
 
 ## Scaling to other cities
 

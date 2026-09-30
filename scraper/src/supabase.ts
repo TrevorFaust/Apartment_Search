@@ -72,6 +72,30 @@ async function enrichWithCoordinates(
   return out;
 }
 
+type ExistingRow = {
+  source: string;
+  external_id: string;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+/** Looks up only the rows being upserted; a bare select is capped at 1000 rows. */
+async function loadExistingRows(
+  listings: ScrapedListing[],
+): Promise<ExistingRow[]> {
+  const ids = [...new Set(listings.map((l) => l.externalId))];
+  const rows: ExistingRow[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase
+      .from("listings")
+      .select("source, external_id, latitude, longitude")
+      .in("external_id", ids.slice(i, i + 100));
+    if (error) throw new Error(`Failed to read existing listings: ${error.message}`);
+    rows.push(...((data ?? []) as ExistingRow[]));
+  }
+  return rows;
+}
+
 /**
  * Upserts scraped listings and returns the ones that were new (not seen before).
  * first_seen_at / is_favorite / is_hidden are intentionally excluded from the
@@ -88,13 +112,10 @@ export async function storeListings(
 
   listings = await enrichWithCoordinates(listings);
 
-  const { data: existing, error: selectError } = await supabase
-    .from("listings")
-    .select("source, external_id, latitude, longitude");
-  if (selectError) throw new Error(`Failed to read existing listings: ${selectError.message}`);
+  const existing = await loadExistingRows(listings);
 
   const existingCoords = new Map<string, { lat: number; lng: number }>();
-  for (const row of existing ?? []) {
+  for (const row of existing) {
     if (row.latitude != null && row.longitude != null) {
       existingCoords.set(`${row.source}:${row.external_id}`, {
         lat: row.latitude,
@@ -103,7 +124,7 @@ export async function storeListings(
     }
   }
 
-  const seen = new Set((existing ?? []).map((r) => `${r.source}:${r.external_id}`));
+  const seen = new Set(existing.map((r) => `${r.source}:${r.external_id}`));
   const newOnes = listings.filter((l) => !seen.has(`${l.source}:${l.externalId}`));
 
   const now = new Date().toISOString();
@@ -126,20 +147,30 @@ export async function storeListings(
       state: l.state,
       latitude,
       longitude,
-      image_url: l.imageUrl,
       amenities: l.amenities,
-      posted_at: l.postedAt,
       last_seen_at: now,
       is_active: true,
+      // Omitted when unknown so a re-scrape never wipes a back-filled value.
+      ...(l.imageUrl ? { image_url: l.imageUrl } : {}),
+      ...(l.postedAt ? { posted_at: l.postedAt } : {}),
     };
   });
 
-  for (let i = 0; i < rows.length; i += 200) {
-    const chunk = rows.slice(i, i + 200);
-    const { error } = await supabase
-      .from("listings")
-      .upsert(chunk, { onConflict: "source,external_id" });
-    if (error) throw new Error(`Failed to upsert listings: ${error.message}`);
+  // supabase-js fills keys missing from some rows in a batch with NULL, so
+  // rows are batched by which optional columns they carry.
+  const batchesByShape = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const shape = Object.keys(row).sort().join(",");
+    batchesByShape.set(shape, [...(batchesByShape.get(shape) ?? []), row]);
+  }
+  for (const batch of batchesByShape.values()) {
+    for (let i = 0; i < batch.length; i += 200) {
+      const chunk = batch.slice(i, i + 200);
+      const { error } = await supabase
+        .from("listings")
+        .upsert(chunk, { onConflict: "source,external_id" });
+      if (error) throw new Error(`Failed to upsert listings: ${error.message}`);
+    }
   }
 
   return newOnes.map((l) => {

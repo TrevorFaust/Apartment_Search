@@ -42,6 +42,8 @@ export interface ListingRow {
   posted_at: string | null;
   first_seen_at: string;
   last_seen_at: string;
+  last_checked_at: string | null;
+  listed_at: string;
   is_active: boolean;
   is_favorite: boolean;
   is_hidden: boolean;

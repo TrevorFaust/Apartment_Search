@@ -74,10 +74,19 @@ export function MultiSelectFilter({
         type="button"
         suppressHydrationWarning
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between border border-ink/30 bg-paper px-2 py-1.5 text-left text-sm text-ink focus:border-rust focus:outline-none"
+        aria-expanded={open}
+        className={`field-control group flex items-center justify-between text-left ${
+          open ? "border-accent" : ""
+        }`}
       >
         <span className="truncate">{summary}</span>
-        <span className="ml-2 text-ink-faint">{open ? "▴" : "▾"}</span>
+        <span
+          className={`ml-2 text-ink-faint transition-transform duration-200 group-hover:text-accent ${
+            open ? "rotate-180 text-accent" : ""
+          }`}
+        >
+          ▾
+        </span>
       </button>
 
       {checked.size > 0 &&
@@ -86,20 +95,22 @@ export function MultiSelectFilter({
         ))}
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto border border-line bg-paper shadow-[3px_3px_0_0_var(--color-line)]">
+        <div className="rise absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto border border-line bg-bg-elevated shadow-[3px_3px_0_0_var(--color-accent)] [animation-duration:150ms]">
           {resolved.length === 0 ? (
             <p className="px-3 py-2 text-xs text-ink-faint">No options</p>
           ) : (
             resolved.map((option) => (
               <label
                 key={option.value}
-                className="flex cursor-pointer items-center gap-2 border-b border-line/40 px-3 py-2 text-sm last:border-b-0 hover:bg-paper-deep"
+                className={`flex items-center gap-2 border-b border-line/40 px-3 py-2 text-sm transition-colors last:border-b-0 hover:bg-accent-wash hover:text-accent-dim ${
+                  checked.has(option.value) ? "bg-accent-wash/60" : ""
+                }`}
               >
                 <input
                   type="checkbox"
                   checked={checked.has(option.value)}
                   onChange={() => toggle(option.value)}
-                  className="accent-rust"
+                  className="accent-accent"
                 />
                 <span className="truncate">{option.label}</span>
               </label>

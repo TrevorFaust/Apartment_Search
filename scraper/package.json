@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "scrape": "tsx src/index.ts",
+    "check-listings": "tsx src/checkListings.ts",
     "test:sources": "tsx src/testRun.ts",
     "typecheck": "tsc --noEmit"
   },

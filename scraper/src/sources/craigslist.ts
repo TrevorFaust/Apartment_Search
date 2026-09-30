@@ -109,7 +109,9 @@ export async function scrapeCraigslist(
         state: location.state,
         latitude: null,
         longitude: null,
-        imageUrl: i.imageUrl,
+        // Off-screen gallery images are 1x1 data: placeholders until scrolled
+        // into view; the liveness check back-fills the real photo instead.
+        imageUrl: i.imageUrl?.startsWith("http") ? i.imageUrl : null,
         amenities: [],
         postedAt: null,
       }));
