@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LinkPending } from "./link-pending";
 
 /**
- * Every page number in one horizontally scrollable strip: drag, swipe, or
- * mouse-wheel through it; the current page starts centered.
+ * Every page number in one centered strip that hugs its pages. Once there are
+ * more than fit, it scrolls (drag, swipe, wheel, or ‹ ›) with the current page
+ * centered.
  */
 export function PageStrip({
   current,
@@ -20,6 +21,17 @@ export function PageStrip({
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const drag = useRef({ active: false, moved: false, x: 0, left: 0 });
+  const [overflows, setOverflows] = useState(false);
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const measure = () => setOverflows(strip.scrollWidth > strip.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(strip);
+    return () => observer.disconnect();
+  }, [total]);
 
   const href = (p: number) => {
     const qs = new URLSearchParams(query);
@@ -63,23 +75,29 @@ export function PageStrip({
 
   return (
     <nav aria-label="Pagination" className="mt-10 flex flex-col items-center gap-3">
-      <div className="flex w-full max-w-2xl items-center gap-2">
+      <div className="flex w-full max-w-2xl items-center justify-center gap-2">
         <StepLink href={current > 1 ? href(current - 1) : null} label="Previous page">
           ←
         </StepLink>
 
-        <div className="relative min-w-0 flex-1 rounded-full border border-line/70 bg-bg-elevated p-1 shadow-soft">
-          <button
-            type="button"
-            aria-label="Scroll page numbers left"
-            onClick={() => nudge(-1)}
-            className="absolute inset-y-1 left-1 z-10 hidden w-8 items-center justify-center rounded-full bg-bg-elevated/90 text-ink-faint transition-colors hover:text-accent sm:flex"
-          >
-            ‹
-          </button>
+        <div className="relative flex min-w-0 rounded-full border border-line/70 bg-bg-elevated p-1 shadow-soft">
+          {overflows && (
+            <button
+              type="button"
+              aria-label="Scroll page numbers left"
+              onClick={() => nudge(-1)}
+              className="absolute inset-y-1 left-1 z-10 hidden w-8 items-center justify-center rounded-full bg-bg-elevated/90 text-ink-faint transition-colors hover:text-accent sm:flex"
+            >
+              ‹
+            </button>
+          )}
           <div
             ref={stripRef}
-            className="flex cursor-grab gap-1 overflow-x-auto px-1 [mask-image:linear-gradient(90deg,transparent,black_2.5rem,black_calc(100%-2.5rem),transparent)] [scrollbar-width:none] active:cursor-grabbing sm:px-9 [&::-webkit-scrollbar]:hidden"
+            className={`flex min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+              overflows
+                ? "cursor-grab px-1 [mask-image:linear-gradient(90deg,transparent,black_2.5rem,black_calc(100%-2.5rem),transparent)] active:cursor-grabbing sm:px-9"
+                : ""
+            }`}
             onPointerDown={(e) => {
               if (e.pointerType !== "mouse") return;
               drag.current = {
@@ -129,14 +147,16 @@ export function PageStrip({
               );
             })}
           </div>
-          <button
-            type="button"
-            aria-label="Scroll page numbers right"
-            onClick={() => nudge(1)}
-            className="absolute inset-y-1 right-1 z-10 hidden w-8 items-center justify-center rounded-full bg-bg-elevated/90 text-ink-faint transition-colors hover:text-accent sm:flex"
-          >
-            ›
-          </button>
+          {overflows && (
+            <button
+              type="button"
+              aria-label="Scroll page numbers right"
+              onClick={() => nudge(1)}
+              className="absolute inset-y-1 right-1 z-10 hidden w-8 items-center justify-center rounded-full bg-bg-elevated/90 text-ink-faint transition-colors hover:text-accent sm:flex"
+            >
+              ›
+            </button>
+          )}
         </div>
 
         <StepLink href={current < total ? href(current + 1) : null} label="Next page">
@@ -144,7 +164,8 @@ export function PageStrip({
         </StepLink>
       </div>
       <p className="text-xs text-ink-faint">
-        Page {current} of {total} · drag or scroll the numbers to jump ahead
+        Page {current} of {total}
+        {overflows && " · drag or scroll the numbers to jump ahead"}
       </p>
     </nav>
   );

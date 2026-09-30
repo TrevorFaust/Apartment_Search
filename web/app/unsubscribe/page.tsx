@@ -18,7 +18,7 @@ export default async function UnsubscribePage({
         <>
           <h2 className="font-display text-2xl font-semibold">You&apos;re unsubscribed</h2>
           <p className="mt-2 text-sm text-ink-soft">
-            No more alert emails. You can turn them back on from My alerts anytime.
+            No more alert emails. You can turn them back on from your Profile anytime.
           </p>
         </>
       ) : typeof token === "string" ? (

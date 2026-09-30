@@ -21,6 +21,7 @@ type Subscriber = {
 };
 
 type ListingRow = {
+  id: string;
   source: string;
   url: string;
   title: string;
@@ -67,7 +68,10 @@ export async function sendSubscriberDigests(): Promise<{
   const earliest = Math.min(
     ...due.map((s) => Date.parse(s.last_digest_at ?? s.onboarded_at)),
   );
-  const listings = await loadListingsSince(new Date(earliest).toISOString());
+  const [listings, hiddenByUser] = await Promise.all([
+    loadListingsSince(new Date(earliest).toISOString()),
+    loadHiddenIds(due.map((s) => s.user_id)),
+  ]);
   const checkedAt = new Date().toISOString();
 
   let sent = 0;
@@ -76,9 +80,11 @@ export async function sendSubscriberDigests(): Promise<{
     const since = s.last_digest_at ?? s.onboarded_at;
     const sinceMs = Date.parse(since);
     const cities = new Set(s.cities.map((c) => c.toLowerCase()));
+    const hidden = hiddenByUser.get(s.user_id);
     const matches = listings.filter(
       (l) =>
         Date.parse(l.first_seen_at) > sinceMs &&
+        !hidden?.has(l.id) &&
         (cities.size === 0 || cities.has(l.city.toLowerCase())) &&
         matchesCriteria(l, s),
     );
@@ -120,9 +126,10 @@ async function loadListingsSince(since: string): Promise<ListingRow[]> {
     const { data, error } = await supabase
       .from("listings")
       .select(
-        "source, url, title, price, bedrooms, bathrooms, sqft, neighborhood, address, city, image_url, first_seen_at",
+        "id, source, url, title, price, bedrooms, bathrooms, sqft, neighborhood, address, city, image_url, first_seen_at",
       )
       .eq("is_active", true)
+      .eq("price_outlier", false)
       .gt("first_seen_at", since)
       .gte("listed_at", cutoff)
       .order("first_seen_at", { ascending: false })
@@ -133,6 +140,27 @@ async function loadListingsSince(since: string): Promise<ListingRow[]> {
     if (!data || data.length < 1000) break;
   }
   return rows;
+}
+
+/** Listings each user has hidden on the site, so their digest skips them too. */
+async function loadHiddenIds(userIds: string[]): Promise<Map<string, Set<string>>> {
+  const byUser = new Map<string, Set<string>>();
+  if (userIds.length === 0) return byUser;
+  const { data, error } = await supabase
+    .from("listing_marks")
+    .select("user_id, listing_id")
+    .in("user_id", userIds)
+    .eq("hidden", true);
+  if (error) {
+    console.error("Failed to load hidden listings:", error.message);
+    return byUser;
+  }
+  for (const row of data ?? []) {
+    const set = byUser.get(row.user_id) ?? new Set<string>();
+    set.add(row.listing_id);
+    byUser.set(row.user_id, set);
+  }
+  return byUser;
 }
 
 function toEmailListing(l: ListingRow): EmailListing {

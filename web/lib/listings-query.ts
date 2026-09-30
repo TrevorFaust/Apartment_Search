@@ -39,7 +39,6 @@ export const SORT_OPTIONS = [
 
 export type ListingFilters = {
   tab: string;
-  minPrice: string;
   maxPrice: string;
   beds: string;
   minSqft: string;
@@ -72,7 +71,6 @@ export function parseFilters(
 
   return {
     tab: str("tab") || "all",
-    minPrice: str("min_price"),
     maxPrice: str("max_price"),
     beds: str("beds"),
     minSqft: str("min_sqft"),
@@ -128,6 +126,8 @@ export function applyListingFilters(
     includeCityFilter?: boolean;
     includeFreshnessFilter?: boolean;
     select?: string;
+    /** The visitor's saved / hidden listing ids. */
+    marks?: { favorites: string[]; hidden: string[] };
   },
 ): QueryLike {
   // PostgrestQueryBuilder (before .select()) has no .eq(); PostgrestFilterBuilder does.
@@ -144,24 +144,28 @@ export function applyListingFilters(
   if (tab !== "favorites" && options?.includeFreshnessFilter !== false) {
     query = query
       .eq("is_active", true)
+      .eq("price_outlier", false)
       .gte("listed_at", daysAgoIso(MAX_LISTING_AGE_DAYS));
   }
 
+  const favorites = options?.marks?.favorites ?? [];
+  const hidden = options?.marks?.hidden ?? [];
+  const idList = (ids: string[]) => (ids.length > 0 ? ids : [NO_MATCH_ID]);
+
   if (tab === "hidden") {
-    query = query.eq("is_hidden", true);
+    query = query.in("id", idList(hidden));
   } else {
-    query = query.eq("is_hidden", false);
+    if (hidden.length > 0) query = query.not("id", "in", `(${hidden.join(",")})`);
     if (tab === "new") {
       query = query.gte("first_seen_at", daysAgoIso(1));
     }
-    if (tab === "favorites") query = query.eq("is_favorite", true);
+    if (tab === "favorites") query = query.in("id", idList(favorites));
   }
 
   if (filters.postedWithin) {
     query = query.gte("listed_at", daysAgoIso(Number(filters.postedWithin)));
   }
 
-  if (filters.minPrice) query = query.gte("price", Number(filters.minPrice));
   if (filters.maxPrice) query = query.lte("price", Number(filters.maxPrice));
   if (filters.beds) query = query.gte("bedrooms", Number(filters.beds));
   if (filters.minSqft) query = query.gte("sqft", Number(filters.minSqft));
@@ -183,6 +187,8 @@ export function applyListingFilters(
 
   return query;
 }
+
+const NO_MATCH_ID = "00000000-0000-0000-0000-000000000000";
 
 function daysAgoIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -228,7 +234,6 @@ export function buildFilterQueryString(
   const f = { ...filters, ...overrides };
 
   if (f.tab && f.tab !== "all") next.set("tab", f.tab);
-  if (f.minPrice) next.set("min_price", f.minPrice);
   if (f.maxPrice) next.set("max_price", f.maxPrice);
   if (f.beds) next.set("beds", f.beds);
   if (f.minSqft) next.set("min_sqft", f.minSqft);
@@ -241,6 +246,20 @@ export function buildFilterQueryString(
   for (const n of f.neighborhoods) next.append("neighborhood", n);
 
   return next.toString();
+}
+
+/** True when any narrowing filter is set (tab and sort don't count). */
+export function hasActiveFilters(f: ListingFilters): boolean {
+  return Boolean(
+    f.maxPrice ||
+      f.beds ||
+      f.minSqft ||
+      f.source ||
+      f.radiusMiles ||
+      f.postedWithin ||
+      f.cities.length ||
+      f.neighborhoods.length,
+  );
 }
 
 type QueryFactory = () => QueryLike;

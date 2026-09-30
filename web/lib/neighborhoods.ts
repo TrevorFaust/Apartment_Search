@@ -3,6 +3,8 @@ export type NeighborhoodOption = {
   value: string;
   /** Dropdown label */
   label: string;
+  /** Metro shown under the label when several cities are in play. */
+  sublabel?: string;
 };
 
 const CITY_NAMES = new Set([
@@ -196,11 +198,17 @@ export function buildNeighborhoodOptions(
     if (byKey.has(value)) continue;
 
     const metro = METRO_LABEL[searchCity] ?? titleCaseWords(searchCity);
-    const label =
-      scopedCities?.size === 1 ? canonical : `${canonical} · ${metro}`;
-
-    byKey.set(value, { value, label });
+    byKey.set(
+      value,
+      scopedCities?.size === 1
+        ? { value, label: canonical }
+        : { value, label: canonical, sublabel: metro },
+    );
   }
 
-  return [...byKey.values()].sort((a, b) => a.label.localeCompare(b.label));
+  return [...byKey.values()].sort(
+    (a, b) =>
+      a.label.localeCompare(b.label) ||
+      (a.sublabel ?? "").localeCompare(b.sublabel ?? ""),
+  );
 }

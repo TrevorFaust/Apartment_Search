@@ -2,16 +2,21 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+export type DropdownOption = { value: string; label: string; sublabel?: string };
+
 /** Button + floating panel shared by every filter dropdown. */
 export function Dropdown({
   label,
   summary,
   inline = false,
+  onClear,
   children,
 }: {
   label: string;
   summary: React.ReactNode;
   inline?: boolean;
+  /** Shows a small × beside the label while the filter has a value. */
+  onClear?: () => void;
   children: (close: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -39,9 +44,7 @@ export function Dropdown({
       ref={rootRef}
       className={`relative flex ${inline ? "items-center gap-2" : "flex-col gap-1"}`}
     >
-      <span id={labelId} className="pl-1 text-[10px] uppercase tracking-widest text-ink-soft">
-        {label}
-      </span>
+      <FieldLabel id={labelId} label={label} onClear={onClear} />
       <button
         type="button"
         suppressHydrationWarning
@@ -61,14 +64,58 @@ export function Dropdown({
         <div
           role="listbox"
           aria-labelledby={labelId}
-          className={`rise absolute top-full z-30 mt-1.5 max-h-72 overflow-y-auto rounded-2xl border border-line/80 bg-bg-elevated p-1.5 shadow-lift [animation-duration:160ms] ${
-            inline ? "right-0 w-max min-w-full" : "left-0 right-0"
+          className={`rise absolute top-full z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-2xl border border-line/80 bg-bg-elevated p-1.5 shadow-lift [animation-duration:160ms] ${
+            inline ? "right-0" : "left-0"
           }`}
         >
           {children(() => setOpen(false))}
         </div>
       )}
     </div>
+  );
+}
+
+/** Filter label with an optional clear (×) button on the right. */
+export function FieldLabel({
+  id,
+  htmlFor,
+  label,
+  onClear,
+}: {
+  id?: string;
+  htmlFor?: string;
+  label: string;
+  onClear?: () => void;
+}) {
+  const Text = htmlFor ? "label" : "span";
+  return (
+    <span className="flex min-h-4 items-center justify-between gap-2 pl-1">
+      <Text id={id} htmlFor={htmlFor} className="text-[10px] uppercase tracking-widest text-ink-soft">
+        {label}
+      </Text>
+      {onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          aria-label={`Clear ${label}`}
+          title={`Clear ${label}`}
+          className="press flex size-4 items-center justify-center rounded-full bg-ink/10 text-[10px] leading-none text-ink-soft hover:bg-accent hover:text-bg-elevated"
+        >
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
+
+export function OptionText({ option }: { option: DropdownOption }) {
+  return (
+    <span className="flex min-w-0 flex-col">
+      <span className="break-words">{option.label}</span>
+      {option.sublabel && (
+        <span className="text-[11px] leading-tight text-ink-faint">{option.sublabel}</span>
+      )}
+    </span>
   );
 }
 
@@ -95,3 +142,9 @@ function Chevron({ open }: { open: boolean }) {
 
 export const OPTION_ROW =
   "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-accent-dim";
+
+/** Submits the form that contains `el` after React has flushed pending state. */
+export function submitClosestForm(el: Element | null) {
+  const form = el instanceof HTMLInputElement && el.form ? el.form : el?.closest("form");
+  form?.requestSubmit();
+}

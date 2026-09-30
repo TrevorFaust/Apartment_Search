@@ -28,6 +28,12 @@ export async function supabaseUser() {
 
 export type Viewer = { id: string; email: string };
 
+/** The site owner (OWNER_EMAIL) is the only one who can change scraper settings. */
+export function isOwner(viewer: Viewer | null): boolean {
+  const owner = process.env.OWNER_EMAIL?.trim().toLowerCase();
+  return !!owner && viewer?.email.toLowerCase() === owner;
+}
+
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const cookieStore = await cookies();
   if (!cookieStore.getAll().some((c) => c.name.startsWith("sb-"))) return null;

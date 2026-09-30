@@ -18,6 +18,7 @@ export function NeighborhoodMultiSelect({
       options={options}
       selected={selected}
       emptyLabel="Any neighborhood"
+      clearSubmits
     />
   );
 }
@@ -36,6 +37,7 @@ export function CityMultiSelect({
       options={options.map((city) => ({ value: city, label: titleCase(city) }))}
       selected={selected}
       emptyLabel="Any city"
+      clearSubmits
     />
   );
 }

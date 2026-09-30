@@ -6,7 +6,10 @@ import { AutoSubmitSelect } from "./auto-submit-select";
 import { FilterForm } from "./filter-form";
 import { LinkPending } from "./link-pending";
 import { PageStrip } from "./page-strip";
+import { FilterInput } from "./filter-input";
 import { SOURCE_OPTIONS } from "@/lib/sources";
+import { getViewer } from "@/lib/auth";
+import { getMarks } from "@/lib/marks";
 import {
   applyListingFilters,
   applyListingSort,
@@ -16,6 +19,7 @@ import {
   fetchDistinctNeighborhoods,
   distinctNeighborhoodOptionsFromListings,
   filterByRadius,
+  hasActiveFilters,
   MAX_LISTING_AGE_DAYS,
   PAGE_SIZE,
   parseFilters,
@@ -46,6 +50,9 @@ export default async function ListingsPage({
   const filters = parseFilters(params);
   const page = parsePage(filters.page);
   const now = Date.now();
+  const marks = await getMarks(await getViewer());
+  const favoriteIds = new Set(marks.favorites);
+  const hiddenIds = new Set(marks.hidden);
 
   // Preferences only supply geocoded city centers for optional radius — not browse filters.
   const { data: prefsData } = await supabaseAdmin()
@@ -70,6 +77,7 @@ export default async function ListingsPage({
       includeNeighborhoodFilter: false,
       includeCityFilter: false,
       select: "id",
+      marks,
     });
 
   const facetsPromise = (async () => {
@@ -101,7 +109,7 @@ export default async function ListingsPage({
 
   if (hasRadius) {
     const { data, error } = await applyListingSort(
-      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters),
+      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters, { marks }),
       filters.sort,
     ).limit(10000);
 
@@ -123,6 +131,7 @@ export default async function ListingsPage({
         .from("listings")
         .select("id", { count: "exact", head: true }),
       filters,
+      { marks },
     );
 
     if (countError) {
@@ -135,7 +144,7 @@ export default async function ListingsPage({
     const offset = (safePage - 1) * PAGE_SIZE;
 
     const { data, error } = await applyListingSort(
-      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters),
+      applyListingFilters(supabaseAdmin().from("listings").select("*"), filters, { marks }),
       filters.sort,
     ).range(offset, offset + PAGE_SIZE - 1);
 
@@ -169,6 +178,11 @@ export default async function ListingsPage({
     const qs = buildFilterQueryString(filters, { tab: id, page: "1" });
     return qs ? `/?${qs}` : "/";
   };
+
+  const clearAllQs = new URLSearchParams();
+  if (filters.tab !== "all") clearAllQs.set("tab", filters.tab);
+  if (filters.sort !== "newest") clearAllQs.set("sort", filters.sort);
+  const clearAllHref = clearAllQs.size ? `/?${clearAllQs}` : "/";
 
   return (
     <div className="rise">
@@ -213,25 +227,19 @@ export default async function ListingsPage({
         {filters.tab !== "all" && (
           <input type="hidden" name="tab" value={filters.tab} />
         )}
-        <Field
-          label="Min $"
-          name="min_price"
-          defaultValue={filters.minPrice}
-          type="number"
-        />
-        <Field
+        <FilterInput
           label="Max $"
           name="max_price"
           defaultValue={filters.maxPrice}
           type="number"
         />
-        <Field
+        <FilterInput
           label="Beds ≥"
           name="beds"
           defaultValue={filters.beds}
           type="number"
         />
-        <Field
+        <FilterInput
           label="Sqft ≥"
           name="min_sqft"
           defaultValue={filters.minSqft}
@@ -242,33 +250,45 @@ export default async function ListingsPage({
           name="posted_within"
           defaultValue={filters.postedWithin}
           options={POSTED_WITHIN_OPTIONS}
+          clearable
         />
         <CityMultiSelect options={cityOptions} selected={filters.cities} />
         <NeighborhoodMultiSelect
           options={neighborhoodOptions}
           selected={filters.neighborhoods}
         />
-        <Field
+        <FilterInput
           label="Radius (mi)"
           name="radius_miles"
           defaultValue={filters.radiusMiles}
           type="number"
-          hint="optional — pick a city first; uses downtown centers from Preferences"
+          hint="from downtown; pick a city first"
         />
         <AutoSubmitSelect
           label="Source"
           name="source"
           defaultValue={filters.source}
           options={SOURCE_OPTIONS}
+          clearable
         />
-        <button
-          suppressHydrationWarning
-          type="submit"
-          className="press self-end rounded-full bg-ink px-5 py-2 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow group-aria-busy:cursor-progress group-aria-busy:opacity-60"
-        >
-          <span className="group-aria-busy:hidden">Filter</span>
-          <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
-        </button>
+        <div className="flex items-end gap-2">
+          <button
+            suppressHydrationWarning
+            type="submit"
+            className="press rounded-full bg-ink px-5 py-2 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow group-aria-busy:cursor-progress group-aria-busy:opacity-60"
+          >
+            <span className="group-aria-busy:hidden">Filter</span>
+            <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
+          </button>
+          {hasActiveFilters(filters) && (
+            <Link
+              href={clearAllHref}
+              className="press rounded-full border border-line px-4 py-2 text-sm text-ink-soft hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+            >
+              <LinkPending>Clear all</LinkPending>
+            </Link>
+          )}
+        </div>
       </FilterForm>
 
       <p className="mb-8 pl-2 text-[11px] text-ink-faint">
@@ -278,8 +298,8 @@ export default async function ListingsPage({
 
       {radiusActive && !hasRadius && (
         <p className="mb-4 rounded-2xl border border-dashed border-ink/25 p-4 text-xs text-ink-soft">
-          Radius needs at least one city selected, with a geocoded downtown center.
-          Save Preferences to geocode city centers, then pick that city here.
+          Radius needs at least one city selected that has a geocoded downtown
+          center (currently the cities the scraper searches).
         </p>
       )}
 
@@ -304,7 +324,14 @@ export default async function ListingsPage({
         <>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {listings.map((l, i) => (
-              <ListingCard key={l.id} listing={l} index={i} now={now} />
+              <ListingCard
+                key={l.id}
+                listing={l}
+                index={i}
+                now={now}
+                favorite={favoriteIds.has(l.id)}
+                hidden={hiddenIds.has(l.id)}
+              />
             ))}
           </div>
 
@@ -326,37 +353,5 @@ function LoadError({ message }: { message: string }) {
     <p className="rounded-2xl border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
       Couldn&apos;t load listings: {message}
     </p>
-  );
-}
-
-function Field({
-  label,
-  name,
-  defaultValue,
-  type = "text",
-  hint,
-}: {
-  label: string;
-  name: string;
-  defaultValue: string;
-  type?: string;
-  hint?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
-      <span className="pl-1">{label}</span>
-      <input
-        suppressHydrationWarning
-        name={name}
-        type={type}
-        defaultValue={defaultValue}
-        className="field-control normal-case tracking-normal"
-      />
-      {hint && (
-        <span className="text-[10px] normal-case tracking-normal text-ink-faint">
-          {hint}
-        </span>
-      )}
-    </label>
   );
 }

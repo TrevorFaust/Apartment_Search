@@ -45,8 +45,7 @@ export interface ListingRow {
   last_checked_at: string | null;
   listed_at: string;
   is_active: boolean;
-  is_favorite: boolean;
-  is_hidden: boolean;
+  price_outlier: boolean;
 }
 
 export interface PreferencesRow {

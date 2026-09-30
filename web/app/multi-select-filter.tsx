@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Dropdown, OPTION_ROW } from "./dropdown";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import {
+  Dropdown,
+  OPTION_ROW,
+  OptionText,
+  submitClosestForm,
+  type DropdownOption,
+} from "./dropdown";
 
-export type FilterOption = string | { value: string; label: string };
+export type FilterOption = string | DropdownOption;
 
-function resolveOption(option: FilterOption): { value: string; label: string } {
+function resolveOption(option: FilterOption): DropdownOption {
   return typeof option === "string"
     ? { value: option, label: option }
     : option;
@@ -17,20 +24,28 @@ export function MultiSelectFilter({
   options,
   selected,
   emptyLabel = "Any",
+  clearSubmits = false,
 }: {
   name: string;
   label: string;
   options: FilterOption[];
   selected: string[];
   emptyLabel?: string;
+  /** When cleared with ×, also submit the form (browse filters). */
+  clearSubmits?: boolean;
 }) {
   const [checked, setChecked] = useState<Set<string>>(() => new Set(selected));
+  const anchorRef = useRef<HTMLSpanElement>(null);
 
   const resolved = useMemo(
     () =>
       options
         .map((option) => resolveOption(option))
-        .sort((a, b) => a.label.localeCompare(b.label)),
+        .sort(
+          (a, b) =>
+            a.label.localeCompare(b.label) ||
+            (a.sublabel ?? "").localeCompare(b.sublabel ?? ""),
+        ),
     [options],
   );
 
@@ -39,9 +54,10 @@ export function MultiSelectFilter({
     [resolved],
   );
 
+  const selectedKey = selected.join("\u0000");
   useEffect(() => {
-    setChecked(new Set(selected));
-  }, [selected]);
+    setChecked(new Set(selectedKey ? selectedKey.split("\u0000") : []));
+  }, [selectedKey]);
 
   const toggle = (value: string) => {
     setChecked((prev) => {
@@ -50,6 +66,11 @@ export function MultiSelectFilter({
       else next.add(value);
       return next;
     });
+  };
+
+  const clear = () => {
+    flushSync(() => setChecked(new Set()));
+    if (clearSubmits) submitClosestForm(anchorRef.current);
   };
 
   const summary =
@@ -61,10 +82,15 @@ export function MultiSelectFilter({
 
   return (
     <>
+      <span ref={anchorRef} hidden />
       {[...checked].map((value) => (
         <input key={value} type="hidden" name={name} value={value} />
       ))}
-      <Dropdown label={label} summary={summary}>
+      <Dropdown
+        label={label}
+        summary={summary}
+        onClear={checked.size > 0 ? clear : undefined}
+      >
         {() =>
           resolved.length === 0 ? (
             <p className="px-3 py-2 text-xs text-ink-faint">No options</p>
@@ -89,7 +115,7 @@ export function MultiSelectFilter({
                   >
                     {on ? "✓" : ""}
                   </span>
-                  <span className="truncate">{option.label}</span>
+                  <OptionText option={option} />
                 </button>
               );
             })

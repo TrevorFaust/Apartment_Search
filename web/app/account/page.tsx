@@ -1,5 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getViewer } from "@/lib/auth";
+import { getViewer, isOwner } from "@/lib/auth";
 import { formatMonthDay } from "@/lib/dates";
 import { getSubscriber } from "@/lib/subscribers";
 import { signOut } from "./actions";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
-export default async function AccountPage({
+export default async function ProfilePage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
@@ -26,6 +27,13 @@ export default async function AccountPage({
     loadAlertOptions(),
   ]);
   const str = (n: number | null) => (n == null ? "" : String(n));
+  const locations =
+    subscriber.locations?.length > 0
+      ? subscriber.locations
+      : subscriber.cities.map((city) => ({
+          city,
+          state: cityCounts.find((c) => c.city === city)?.state ?? "",
+        }));
   const status =
     subscriber.frequency === "off"
       ? "Emails are off."
@@ -41,19 +49,29 @@ export default async function AccountPage({
         <div>
           <p className="text-[11px] uppercase tracking-[0.3em] text-accent">{viewer.email}</p>
           <h2 className="mt-2 font-display text-3xl font-semibold leading-tight">
-            My <span className="font-normal italic text-accent">alerts</span>
+            Pad <span className="font-normal italic text-accent">profile</span>
           </h2>
           <p className="mt-1 text-sm text-ink-soft">{status}</p>
         </div>
-        <form action={signOut}>
-          <button
-            suppressHydrationWarning
-            type="submit"
-            className="press rounded-full border border-ink/15 bg-bg-elevated px-4 py-1.5 text-sm text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
-          >
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          {isOwner(viewer) && (
+            <Link
+              href="/preferences"
+              className="press rounded-full border border-ink/15 bg-bg-elevated px-4 py-1.5 text-sm text-ink-soft hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+            >
+              Scraper settings
+            </Link>
+          )}
+          <form action={signOut}>
+            <button
+              suppressHydrationWarning
+              type="submit"
+              className="press rounded-full border border-ink/15 bg-bg-elevated px-4 py-1.5 text-sm text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
 
       {saved && (
@@ -69,7 +87,7 @@ export default async function AccountPage({
           cityCounts={cityCounts}
           neighborhoodOptions={neighborhoodOptions}
           values={{
-            cities: subscriber.cities,
+            locations: locations.filter((l) => l.state),
             neighborhoods: subscriber.neighborhoods,
             maxPrice: str(subscriber.max_price),
             minBeds: str(subscriber.min_beds),

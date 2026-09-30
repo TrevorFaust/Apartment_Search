@@ -12,7 +12,6 @@ export default async function WelcomePage() {
   if ((await getSubscriber(viewer.id))?.onboarded_at) redirect("/account");
 
   const { cityCounts, neighborhoodOptions } = await loadAlertOptions();
-  const busiestCity = cityCounts[0]?.city;
 
   return (
     <div className="rise mx-auto max-w-2xl">
@@ -21,8 +20,9 @@ export default async function WelcomePage() {
         What are you <span className="font-normal italic text-accent">looking for?</span>
       </h2>
       <p className="mt-2 mb-8 text-sm text-ink-soft">
-        We&apos;ve picked the most popular choices to start. Tap anything that
-        doesn&apos;t fit, then save. You can change it all later.
+        Type the city you&apos;re moving to. We&apos;ve picked the most popular
+        choices for the rest; tap anything that doesn&apos;t fit. You can fine-tune
+        exact numbers later in your profile.
       </p>
       <div className="rounded-[2rem] border border-line/70 bg-bg-elevated p-7 shadow-lift sm:p-9">
         <AlertsForm
@@ -31,7 +31,7 @@ export default async function WelcomePage() {
           cityCounts={cityCounts}
           neighborhoodOptions={neighborhoodOptions}
           values={{
-            cities: busiestCity ? [busiestCity] : [],
+            locations: [],
             neighborhoods: [],
             maxPrice: DEFAULT_CRITERIA.maxPrice,
             minBeds: DEFAULT_CRITERIA.minBeds,

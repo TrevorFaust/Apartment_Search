@@ -4,7 +4,7 @@ Personal apartment-hunting pipeline: scrapes listings once a day, stores them
 in Supabase, emails you a newsletter of anything new in the last 24 hours, and
 gives you a small web app ([leaselocator.vercel.app](https://leaselocator.vercel.app))
 to browse, filter, sort, and favorite listings. Visitors can optionally sign in
-to get their own daily or weekly email alerts.
+to get their own daily or weekly email alerts for any US city.
 
 The list is meant for finding overlooked gems, not an ever-growing archive:
 only listings posted in the last **60 days** that are **still online** show up.
@@ -28,7 +28,7 @@ All scraping is once daily, low volume, for personal use. Be kind to the sites.
 ## Layout
 
 - `scraper/` — Node + TypeScript pipeline (`npm run scrape`)
-- `web/` — Next.js app: browse listings, set preferences, mark favorites (`npm run dev`)
+- `web/` — Next.js app: browse listings, profiles and alerts, favorites, owner-only scraper settings (`npm run dev`)
 - `.github/workflows/scrape.yml` — daily cron on GitHub Actions
 
 ## Setup
@@ -57,10 +57,13 @@ Copy `.env.example` to `.env` and fill in:
   `Lease Locator <alerts@yourdomain.com>`. Resend's default
   `onboarding@resend.dev` only delivers to your own Resend email, so other
   subscribers need a domain verified in Resend.
+- `OWNER_EMAIL` — the account allowed to open `/preferences` (scraper
+  settings). Set it on Vercel too. Everyone else only sees their own Profile.
 
 ### 3. Set your search preferences
 
-Run the web app and fill in the Scraper settings page:
+Run the web app, sign in with `OWNER_EMAIL`, and fill in Scraper settings
+(linked from your Profile page):
 
 ```bash
 npm run dev
@@ -98,8 +101,33 @@ seen before counts as new and gets emailed.
 ## How dedupe works
 
 Each listing is keyed by `(source, external_id)`. Re-scraped listings update
-`last_seen_at` but keep their original `first_seen_at`, favorite, and hidden
-flags. A listing is "new" if that key has never been seen before.
+`last_seen_at` but keep their original `first_seen_at`. A listing is "new" if
+that key has never been seen before.
+
+## Underpriced listings (scam filter)
+
+There's no minimum-price filter; instead, listings priced far below their
+peers are dropped. After each scrape, `flag_price_outliers()` groups active
+listings from the last 60 days by city and bedroom count (studio, 1, 2, 3, 4+),
+computes the mean and standard deviation (ignoring prices under 40% of the
+group median so the scams don't drag the average down), and flags anything
+below **mean − 2.5 × SD** (groups need at least 8 listings). Groups without
+enough data, or listings with no bedroom count, use 80% of the city's lowest
+cutoff, and nothing under $400 ever passes. Flagged listings are hidden on the
+site and left out of emails. Current cutoffs live in the `price_cutoffs` table:
+
+| City | Beds | Mean | SD | Cutoff |
+| --- | --- | --- | --- | --- |
+| Chicago | Studio | $1,736 | $455 | $597 |
+| Chicago | 1 | $1,890 | $433 | $808 |
+| Chicago | 2 | $2,532 | $582 | $1,076 |
+| Chicago | 3 | $2,685 | $487 | $1,468 |
+| Chicago | 4+ | $2,735 | $593 | $1,254 |
+| Seattle | 1 | $2,124 | $238 | $1,529 |
+| Seattle | 2 | $2,409 | $313 | $1,626 |
+| Seattle | 3 | $2,491 | $292 | $1,761 |
+
+(At 2 SD, real listings like a $1,000 Chicago 1BR got caught, so it's 2.5.)
 
 ## Freshness and availability checks
 
@@ -122,17 +150,31 @@ flags. A listing is "new" if that key has never been seen before.
 Stock "coming soon" / "no photo" images and lazy-load stubs are treated as no
 photo. Units from building-based sources (UrbanAbodes, Domu, etc.) with no photo
 borrow one from another unit in the same building (`borrow_building_photos()`
-runs after each scrape). Anything still without a photo gets a designed
-placeholder card.
+runs after each scrape). Anything still without a photo shows a street map
+centered on the listing (OpenStreetMap tiles with a pin; coordinates come from
+the listing page during availability checks). Listings without coordinates get
+a designed placeholder card.
 
 ## Sign-in and email alerts
 
 Sign-in is optional. Accounts are email + password (Supabase Auth, created
 server-side and pre-confirmed because Supabase's built-in mailer only reaches
-project members). On first sign-in, `/welcome` asks for city, neighborhoods,
-budget, bedrooms, bathrooms, size, and daily/weekly/no emails, with the most
-popular choices already picked. Criteria live in `listing_alerts` (the Supabase
-project is shared with another app that owns `subscribers`).
+project members). On first sign-in, `/welcome` asks for cities (an open "any US
+city" field, with the cities already tracked as one-tap suggestions),
+neighborhoods, budget, bedrooms, bathrooms, size, and daily/weekly/no emails,
+with the most popular choices already picked. The **Profile** page (`/account`)
+edits the same things and also takes exact numbers (e.g. $3,200, 1.5 baths).
+Criteria live in `listing_alerts` (the Supabase project is shared with another
+app that owns `subscribers`).
+
+Cities subscribers pick that the owner's settings don't cover are added to the
+next scrape (up to 5 extra, most requested first), searched without the owner's
+price/size limits. The owner's newsletter stays limited to the owner's cities.
+
+Favorites and hidden listings are per person: signed-in users' marks are
+stored in `listing_marks`, and a digest never includes something you hid.
+Guests' marks live in a browser-session cookie and disappear when the browser
+closes.
 
 After each scrape, every subscriber who's due (daily, or 7 days since the last
 weekly) gets an email with only listings first seen since their previous
@@ -147,10 +189,12 @@ LIVENESS_BUDGET=3000 npm run check-listings
 
 ## Browsing
 
-Filter by price, beds, size, city, neighborhood, radius, source, and how
-recently a listing was posted (24 hours to 2 months). Sort by newest/oldest
-posted, price, size, or bedrooms. Pages are a scrollable strip of page numbers
-(drag, swipe, or mouse-wheel to jump anywhere). Colors follow the shared
+Filter by max price, beds, size, city, neighborhood, radius, source, and how
+recently a listing was posted (24 hours to 2 months). Each filter has a small ×
+to clear it, and **Clear all** resets everything but the tab and sort. Sort by
+newest/oldest posted, price, size, or bedrooms. The page-number strip hugs
+however many pages there are, centered; once they don't fit it scrolls (drag,
+swipe, or mouse-wheel to jump anywhere). Colors follow the shared
 palette used across my other sites (warm gray `#e6e3db` base, forest green
 `#3d6f5f` accent), with rounded, soft-shadowed surfaces.
 
@@ -171,6 +215,6 @@ cities at once (e.g. Seattle + Chicago) — national sources scrape both.
 ## Radius filter
 
 Set **radius in miles** on Scraper settings. The center for each search city is
-geocoded automatically as that city&apos;s downtown (no address to type).
-Save Preferences after adding/changing cities so centers are refreshed.
+geocoded automatically as that city's downtown (no address to type).
+Save Scraper settings after adding/changing cities so centers are refreshed.
 Listings are geocoded during scrapes (up to 120 per run).

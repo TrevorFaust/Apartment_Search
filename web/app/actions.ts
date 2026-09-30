@@ -2,23 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { geocodeCityCenter } from "@/lib/geocode";
+import { redirect } from "next/navigation";
+import { getViewer, isOwner } from "@/lib/auth";
+import { setMark } from "@/lib/marks";
 import { supabaseAdmin, type SearchLocation } from "@/lib/supabase";
 
 export async function toggleFavorite(id: string, value: boolean) {
-  const { error } = await supabaseAdmin()
-    .from("listings")
-    .update({ is_favorite: value })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  await setMark(await getViewer(), id, "favorite", value);
   revalidatePath("/");
 }
 
 export async function toggleHidden(id: string, value: boolean) {
-  const { error } = await supabaseAdmin()
-    .from("listings")
-    .update({ is_hidden: value })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
+  await setMark(await getViewer(), id, "hidden", value);
   revalidatePath("/");
 }
 
@@ -68,6 +63,8 @@ async function attachCityCenters(
 }
 
 export async function savePreferences(formData: FormData) {
+  if (!isOwner(await getViewer())) redirect("/account");
+
   const num = (name: string): number | null => {
     const v = formData.get(name);
     if (v == null || v === "") return null;

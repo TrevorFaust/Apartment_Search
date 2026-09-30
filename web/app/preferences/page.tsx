@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { getViewer, isOwner } from "@/lib/auth";
 import { supabaseAdmin, normalizeLocations, type PreferencesRow } from "@/lib/supabase";
 import { savePreferences } from "../actions";
 import { LocationsEditor } from "../locations-editor";
@@ -12,6 +14,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function PreferencesPage() {
+  const viewer = await getViewer();
+  if (!isOwner(viewer)) redirect(viewer ? "/account" : "/signin");
+
   const { data, error } = await supabaseAdmin()
     .from("preferences")
     .select("*")
@@ -69,7 +74,7 @@ export default async function PreferencesPage() {
       </h2>
       <p className="mt-1 mb-8 text-sm text-ink-soft">
         These drive the scraper&apos;s search areas, radius filter, and the
-        owner&apos;s daily newsletter. For your own email alerts, use My alerts.
+        owner&apos;s daily newsletter. For your own email alerts, use your Profile.
       </p>
 
       <form

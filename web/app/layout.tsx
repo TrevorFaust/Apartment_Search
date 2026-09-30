@@ -56,12 +56,9 @@ export default async function RootLayout({
                 <Link href="/" className={NAV_LINK}>
                   <LinkPending>Listings</LinkPending>
                 </Link>
-                <Link href="/preferences" className={NAV_LINK}>
-                  <LinkPending>Scraper settings</LinkPending>
-                </Link>
                 {viewer ? (
                   <Link href="/account" className={NAV_CTA} title={viewer.email}>
-                    <LinkPending>My alerts</LinkPending>
+                    <LinkPending>Profile</LinkPending>
                   </Link>
                 ) : (
                   <Link href="/signin" className={NAV_CTA}>

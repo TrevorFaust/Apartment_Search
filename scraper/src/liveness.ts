@@ -16,16 +16,22 @@ const HOST_FAILURE_LIMIT = 8;
 const UNCHECKABLE_SOURCES = new Set(["apartments_com"]);
 
 type Verdict =
-  | { status: "live"; postedAt: string | null; imageUrl: string | null }
+  | {
+      status: "live";
+      postedAt: string | null;
+      imageUrl: string | null;
+      coords: { lat: number; lng: number } | null;
+    }
   | { status: "gone" }
   | { status: "unknown"; reason: string };
 
-type Candidate = {
+export type Candidate = {
   id: string;
   source: string;
   url: string;
   posted_at: string | null;
   image_url: string | null;
+  latitude: number | null;
 };
 
 const GONE_MARKERS =
@@ -74,7 +80,20 @@ async function checkUrl(candidate: Candidate): Promise<Verdict> {
     status: "live",
     postedAt: parseCraigslistPostedAt(html),
     imageUrl: parseOgImage(html),
+    coords: parseCoordinates(html),
   };
+}
+
+/** Map coordinates from embedded JSON (UrbanAbodes, JSON-LD) or Craigslist's map div. */
+function parseCoordinates(html: string): { lat: number; lng: number } | null {
+  const m =
+    html.match(/\\?"latitude\\?"\s*:\s*"?(-?\d{1,3}\.\d+)"?\s*,\s*\\?"longitude\\?"\s*:\s*"?(-?\d{1,3}\.\d+)/) ??
+    html.match(/data-latitude="(-?\d{1,3}\.\d+)"\s+data-longitude="(-?\d{1,3}\.\d+)"/);
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) return null;
+  return { lat, lng };
 }
 
 function parseOgImage(html: string): string | null {
@@ -105,11 +124,10 @@ async function loadCandidates(budget: number): Promise<Candidate[]> {
     const to = Math.min(budget, from + 1000) - 1;
     const { data, error } = await supabase
       .from("listings")
-      .select("id, source, url, posted_at, image_url")
+      .select("id, source, url, posted_at, image_url, latitude")
       .eq("is_active", true)
       .gte("listed_at", cutoff)
       .not("source", "in", `(${[...UNCHECKABLE_SOURCES].join(",")})`)
-      .order("is_favorite", { ascending: false })
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .order("id")
       .range(from, to);
@@ -168,6 +186,10 @@ export async function checkListingsStillOnline(
           }
           if (verdict.imageUrl && !cleanImageUrl(candidate.image_url)) {
             update.image_url = verdict.imageUrl;
+          }
+          if (verdict.coords && candidate.latitude == null) {
+            update.latitude = verdict.coords.lat;
+            update.longitude = verdict.coords.lng;
           }
         }
         const { error } = await supabase

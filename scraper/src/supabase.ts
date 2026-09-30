@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Preferences, ScrapedListing } from "./types.js";
+import type { Preferences, ScrapedListing, SearchLocation } from "./types.js";
 import { cleanImageUrl } from "./images.js";
 import { normalizeLocations } from "./types.js";
 import {
@@ -30,6 +30,39 @@ export async function loadPreferences(): Promise<Preferences> {
   const prefs = data as Preferences;
   prefs.locations = normalizeLocations(prefs);
   return prefs;
+}
+
+// Each extra city adds a Craigslist + Apartments.com pass, so keep the run
+// inside the workflow timeout.
+const MAX_SUBSCRIBER_CITIES = 5;
+
+/** Cities active subscribers picked that the owner's settings don't already cover, most requested first. */
+export async function loadSubscriberLocations(
+  covered: SearchLocation[],
+): Promise<SearchLocation[]> {
+  const { data, error } = await supabase
+    .from("listing_alerts")
+    .select("locations")
+    .neq("frequency", "off")
+    .not("onboarded_at", "is", null);
+  if (error) throw new Error(`Failed to load subscriber cities: ${error.message}`);
+
+  const skip = new Set(covered.map((l) => l.city.toLowerCase()));
+  const tally = new Map<string, { loc: SearchLocation; count: number }>();
+  for (const row of data ?? []) {
+    for (const raw of (row.locations ?? []) as Array<{ city?: string; state?: string }>) {
+      const city = String(raw.city ?? "").trim().toLowerCase();
+      const state = String(raw.state ?? "").trim().toLowerCase();
+      if (!city || !/^[a-z]{2}$/.test(state) || skip.has(city)) continue;
+      const entry = tally.get(city) ?? { loc: { city, state }, count: 0 };
+      entry.count += 1;
+      tally.set(city, entry);
+    }
+  }
+  return [...tally.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, MAX_SUBSCRIBER_CITIES)
+    .map((e) => e.loc);
 }
 
 async function enrichWithCoordinates(
@@ -193,6 +226,24 @@ export async function borrowBuildingPhotos(): Promise<number> {
   const { data, error } = await supabase.rpc("borrow_building_photos");
   if (error) throw new Error(`Failed to borrow building photos: ${error.message}`);
   return (data as number) ?? 0;
+}
+
+/** Recomputes per city/bedroom rent cutoffs and flags way-underpriced listings. */
+export async function flagPriceOutliers(): Promise<number> {
+  const { data, error } = await supabase.rpc("flag_price_outliers");
+  if (error) throw new Error(`Failed to flag price outliers: ${error.message}`);
+  return (data as number) ?? 0;
+}
+
+/** `source:external_id` keys of flagged listings first seen since `since`. */
+export async function loadOutlierKeys(since: string): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("source, external_id")
+    .eq("price_outlier", true)
+    .gte("first_seen_at", since);
+  if (error) throw new Error(`Failed to load price outliers: ${error.message}`);
+  return new Set((data ?? []).map((r) => `${r.source}:${r.external_id}`));
 }
 
 export async function recordRun(run: {

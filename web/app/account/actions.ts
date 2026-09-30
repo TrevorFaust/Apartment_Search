@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { getViewer, supabaseUser } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getSubscriber, type Frequency } from "@/lib/subscribers";
+import { getSubscriber, parseAlertLocations, type Frequency } from "@/lib/subscribers";
 
 export type AuthState = {
   error: string | null;
@@ -89,7 +89,8 @@ export async function saveAlerts(formData: FormData) {
 
   const existing = await getSubscriber(viewer.id);
   const now = new Date().toISOString();
-  const cities = list("cities");
+  const locations = parseAlertLocations(formData.get("locations_json"));
+  const cities = locations.map((l) => l.city);
   const neighborhoods = list("neighborhoods");
   const maxPrice = num("max_price");
   const minBeds = num("min_beds");
@@ -103,6 +104,7 @@ export async function saveAlerts(formData: FormData) {
         email: viewer.email,
         frequency,
         cities,
+        locations,
         neighborhoods,
         max_price: maxPrice,
         min_beds: minBeds,

@@ -18,7 +18,10 @@ import { scrapeDomu } from "./sources/domu.js";
 
 import {
   borrowBuildingPhotos,
+  flagPriceOutliers,
+  loadOutlierKeys,
   loadPreferences,
+  loadSubscriberLocations,
   recordRun,
   storeListings,
 } from "./supabase.js";
@@ -170,6 +173,20 @@ async function main() {
   const prefs = await loadPreferences();
 
   const locations = prefs.locations;
+  const ownerCities = new Set(locations.map((l) => l.city.toLowerCase()));
+  // Cities subscribers asked for, searched without the owner's price/size limits.
+  const extraLocations = await loadSubscriberLocations(locations).catch((err) => {
+    console.error("Failed to load subscriber cities:", err);
+    return [] as SearchLocation[];
+  });
+  const openPrefs: Preferences = {
+    ...prefs,
+    min_price: null,
+    max_price: null,
+    min_beds: null,
+    min_baths: null,
+    min_sqft: null,
+  };
 
   console.log(
 
@@ -191,6 +208,11 @@ async function main() {
 
     all.push(...(await scrapeLocation(context, prefs, location)));
 
+  }
+
+  for (const location of extraLocations) {
+    console.log(`Scraping subscriber city ${location.city}, ${location.state.toUpperCase()}...`);
+    all.push(...(await scrapeLocation(context, openPrefs, location)));
   }
 
 
@@ -231,22 +253,22 @@ async function main() {
     console.error(err);
   }
 
-  if (process.env.RESEND_API_KEY) {
-    try {
-      const digests = await sendSubscriberDigests();
-      console.log(
-        `Subscriber digests: ${digests.due} due, ${digests.sent} sent, ${digests.failed} failed`,
-      );
-    } catch (err) {
-      console.error("Subscriber digests failed:", err);
-      runError = `${runError ? runError + "; " : ""}digests: ${err instanceof Error ? err.message : String(err)}`;
-    }
-
+  let outlierKeys = new Set<string>();
+  try {
+    const flagged = await flagPriceOutliers();
+    outlierKeys = await loadOutlierKeys(startedAt);
+    console.log(`Price outliers: ${flagged} active listings flagged as way underpriced`);
+  } catch (err) {
+    console.error(err);
+    runError = `${runError ? runError + "; " : ""}outliers: ${err instanceof Error ? err.message : String(err)}`;
   }
 
-
-
-  const matching = newListings.filter((l) => matchesPreferences(l, prefs));
+  const matching = newListings.filter(
+    (l) =>
+      !outlierKeys.has(`${l.source}:${l.externalId}`) &&
+      ownerCities.has(l.city.toLowerCase()) &&
+      matchesPreferences(l, prefs),
+  );
 
   const emailTo = prefs.email_to ?? process.env.EMAIL_TO;
 

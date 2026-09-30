@@ -5,15 +5,20 @@ import type { ListingRow } from "@/lib/supabase";
 import { formatFull, formatMonthDay } from "@/lib/dates";
 import { sourceLabel as labelForSource } from "@/lib/sources";
 import { toggleFavorite, toggleHidden } from "./actions";
+import { MapThumb } from "./map-thumb";
 
 export function ListingCard({
   listing,
   index,
   now,
+  favorite,
+  hidden,
 }: {
   listing: ListingRow;
   index: number;
   now: number;
+  favorite: boolean;
+  hidden: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const [imageFailed, setImageFailed] = useState(false);
@@ -65,6 +70,12 @@ export function ListingCard({
                   setImageFailed(true);
                 }
               }}
+            />
+          ) : listing.latitude != null && listing.longitude != null ? (
+            <MapThumb
+              lat={listing.latitude}
+              lng={listing.longitude}
+              label={listing.neighborhood ? `No photos · ${listing.neighborhood}` : "No photos posted"}
             />
           ) : (
             <NoPhoto neighborhood={listing.neighborhood} />
@@ -126,29 +137,29 @@ export function ListingCard({
             // before hydration; ignore those mismatches.
             suppressHydrationWarning
             disabled={pending}
-            aria-pressed={listing.is_favorite}
+            aria-pressed={favorite}
             onClick={() =>
               startTransition(() =>
-                toggleFavorite(listing.id, !listing.is_favorite),
+                toggleFavorite(listing.id, !favorite),
               )
             }
             className={`press flex-1 rounded-full border px-3 py-1.5 text-xs disabled:opacity-50 ${
-              listing.is_favorite
+              favorite
                 ? "border-accent bg-accent text-bg-elevated shadow-glow hover:border-accent-dim hover:bg-accent-dim"
                 : "border-ink/15 bg-bg hover:border-accent/50 hover:bg-accent-wash hover:text-accent-dim"
             }`}
           >
-            {pending ? "…" : listing.is_favorite ? "★ Saved" : "☆ Save"}
+            {pending ? "…" : favorite ? "★ Saved" : "☆ Save"}
           </button>
           <button
             suppressHydrationWarning
             disabled={pending}
             onClick={() =>
-              startTransition(() => toggleHidden(listing.id, !listing.is_hidden))
+              startTransition(() => toggleHidden(listing.id, !hidden))
             }
             className="press rounded-full border border-ink/15 bg-bg px-4 py-1.5 text-xs text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated disabled:opacity-50"
           >
-            {listing.is_hidden ? "Unhide" : "Hide"}
+            {hidden ? "Unhide" : "Hide"}
           </button>
         </div>
       </div>

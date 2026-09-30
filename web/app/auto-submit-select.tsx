@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { Dropdown, OPTION_ROW } from "./dropdown";
+import { Dropdown, OPTION_ROW, submitClosestForm } from "./dropdown";
 
 type Option = { value: string; label: string };
 
@@ -14,6 +14,7 @@ export function AutoSubmitSelect({
   options,
   form,
   inline = false,
+  clearable = false,
 }: {
   label: string;
   name: string;
@@ -21,6 +22,8 @@ export function AutoSubmitSelect({
   options: readonly Option[];
   form?: string;
   inline?: boolean;
+  /** Offer a × that resets to the "" option. */
+  clearable?: boolean;
 }) {
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,13 +37,18 @@ export function AutoSubmitSelect({
   const choose = (next: string) => {
     if (next === value) return;
     flushSync(() => setValue(next));
-    inputRef.current?.form?.requestSubmit();
+    submitClosestForm(inputRef.current);
   };
 
   return (
     <>
       <input ref={inputRef} type="hidden" name={name} value={value} form={form} />
-      <Dropdown label={label} summary={current?.label} inline={inline}>
+      <Dropdown
+        label={label}
+        summary={current?.label}
+        inline={inline}
+        onClear={clearable && value !== "" ? () => choose("") : undefined}
+      >
         {(close) =>
           options.map((o) => {
             const selected = o.value === value;
@@ -57,7 +65,7 @@ export function AutoSubmitSelect({
                 className={`${OPTION_ROW} ${selected ? "font-medium text-accent-dim" : ""}`}
               >
                 <span className={`size-1.5 shrink-0 rounded-full ${selected ? "bg-accent" : "bg-transparent"}`} />
-                {o.label}
+                <span className="break-words">{o.label}</span>
               </button>
             );
           })

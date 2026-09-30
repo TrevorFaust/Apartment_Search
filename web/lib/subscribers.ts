@@ -7,6 +7,7 @@ export interface SubscriberRow {
   email: string;
   frequency: Frequency;
   cities: string[];
+  locations: AlertLocation[];
   neighborhoods: string[];
   min_price: number | null;
   max_price: number | null;
@@ -75,25 +76,55 @@ export async function getSubscriber(userId: string): Promise<SubscriberRow | nul
   return data as SubscriberRow | null;
 }
 
+export type AlertLocation = { city: string; state: string };
+
+export type CityCount = AlertLocation & { count: number };
+
 /** Active cities with listing counts, most listings first. */
-export async function fetchCityCounts(): Promise<Array<{ city: string; count: number }>> {
-  const counts = new Map<string, number>();
+export async function fetchCityCounts(): Promise<CityCount[]> {
+  const counts = new Map<string, CityCount>();
   const cutoff = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await supabaseAdmin()
       .from("listings")
-      .select("city")
+      .select("city, state")
       .eq("is_active", true)
       .gte("listed_at", cutoff)
       .order("id")
       .range(offset, offset + 999);
     if (error) throw new Error(error.message);
     for (const row of data ?? []) {
-      if (row.city) counts.set(row.city, (counts.get(row.city) ?? 0) + 1);
+      if (!row.city) continue;
+      const entry = counts.get(row.city) ?? {
+        city: row.city,
+        state: (row.state ?? "").toLowerCase(),
+        count: 0,
+      };
+      entry.count += 1;
+      if (!entry.state && row.state) entry.state = row.state.toLowerCase();
+      counts.set(row.city, entry);
     }
     if (!data || data.length < 1000) break;
   }
-  return [...counts.entries()]
-    .map(([city, count]) => ({ city, count }))
-    .sort((a, b) => b.count - a.count);
+  return [...counts.values()].sort((a, b) => b.count - a.count);
+}
+
+/** Validates the city picker's JSON: lowercase `{city, state}` pairs, deduped. */
+export function parseAlertLocations(raw: unknown): AlertLocation[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw ?? "[]"));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const seen = new Map<string, AlertLocation>();
+  for (const item of parsed) {
+    const city = String(item?.city ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    const state = String(item?.state ?? "").trim().toLowerCase();
+    if (!/^[a-z][a-z .'-]{1,49}$/.test(city) || !/^[a-z]{2}$/.test(state)) continue;
+    seen.set(city, { city, state });
+    if (seen.size >= 10) break;
+  }
+  return [...seen.values()];
 }
