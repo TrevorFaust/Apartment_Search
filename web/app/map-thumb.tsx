@@ -1,4 +1,3 @@
-const ZOOM = 15;
 const TILE = 256;
 
 /**
@@ -9,12 +8,14 @@ export function MapThumb({
   lat,
   lng,
   label,
+  zoom = 15,
 }: {
   lat: number;
   lng: number;
   label: string;
+  zoom?: number;
 }) {
-  const scale = 2 ** ZOOM;
+  const scale = 2 ** zoom;
   const latRad = (lat * Math.PI) / 180;
   const x = ((lng + 180) / 360) * scale;
   const y =
@@ -29,7 +30,7 @@ export function MapThumb({
       const ty = tileY + dy;
       tiles.push({
         key: `${tx}-${ty}`,
-        src: `https://tile.openstreetmap.org/${ZOOM}/${tx}/${ty}.png`,
+        src: `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`,
         left: (tx - x) * TILE,
         top: (ty - y) * TILE,
       });

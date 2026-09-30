@@ -20,6 +20,7 @@ type Verdict =
       status: "live";
       postedAt: string | null;
       imageUrl: string | null;
+      address: string | null;
       coords: { lat: number; lng: number } | null;
     }
   | { status: "gone" }
@@ -31,6 +32,7 @@ export type Candidate = {
   url: string;
   posted_at: string | null;
   image_url: string | null;
+  address: string | null;
   latitude: number | null;
 };
 
@@ -80,6 +82,7 @@ async function checkUrl(candidate: Candidate): Promise<Verdict> {
     status: "live",
     postedAt: parseCraigslistPostedAt(html),
     imageUrl: parseOgImage(html),
+    address: parseStreetAddress(html),
     coords: parseCoordinates(html),
   };
 }
@@ -103,6 +106,15 @@ function parseOgImage(html: string): string | null {
   return cleanImageUrl(m?.[1]?.replace(/&amp;/g, "&"));
 }
 
+/** Street line from a Craigslist posting (`h2.street-address` or the map caption). */
+function parseStreetAddress(html: string): string | null {
+  const raw =
+    html.match(/<h2 class="street-address">([^<]+)<\/h2>/i)?.[1] ??
+    html.match(/<div class="mapaddress">([^<]+)<\/div>/i)?.[1];
+  const text = raw?.replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  return text || null;
+}
+
 function parseCraigslistPostedAt(html: string): string | null {
   const m = html.match(
     /id="display-date"[\s\S]{0,200}?<time[^>]*datetime="([^"]+)"/,
@@ -124,10 +136,11 @@ async function loadCandidates(budget: number): Promise<Candidate[]> {
     const to = Math.min(budget, from + 1000) - 1;
     const { data, error } = await supabase
       .from("listings")
-      .select("id, source, url, posted_at, image_url, latitude")
+      .select("id, source, url, posted_at, image_url, address, latitude")
       .eq("is_active", true)
       .gte("listed_at", cutoff)
       .not("source", "in", `(${[...UNCHECKABLE_SOURCES].join(",")})`)
+      .order("latitude", { ascending: true, nullsFirst: true })
       .order("last_checked_at", { ascending: true, nullsFirst: true })
       .order("id")
       .range(from, to);
@@ -186,6 +199,9 @@ export async function checkListingsStillOnline(
           }
           if (verdict.imageUrl && !cleanImageUrl(candidate.image_url)) {
             update.image_url = verdict.imageUrl;
+          }
+          if (verdict.address && !candidate.address) {
+            update.address = verdict.address;
           }
           if (verdict.coords && candidate.latitude == null) {
             update.latitude = verdict.coords.lat;

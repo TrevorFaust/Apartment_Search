@@ -5,7 +5,7 @@ import { geocodeCityCenter } from "@/lib/geocode";
 import { redirect } from "next/navigation";
 import { parseAmount } from "@/lib/amounts";
 import { getViewer, isOwner } from "@/lib/auth";
-import { setMark } from "@/lib/marks";
+import { setMark, setPursuit, type Pursuit } from "@/lib/marks";
 import { supabaseAdmin, type SearchLocation } from "@/lib/supabase";
 
 export async function toggleFavorite(id: string, value: boolean) {
@@ -15,6 +15,11 @@ export async function toggleFavorite(id: string, value: boolean) {
 
 export async function toggleHidden(id: string, value: boolean) {
   await setMark(await getViewer(), id, "hidden", value);
+  revalidatePath("/");
+}
+
+export async function updatePursuit(id: string, pursuit: Pursuit | null) {
+  await setPursuit(await getViewer(), id, pursuit);
   revalidatePath("/");
 }
 

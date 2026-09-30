@@ -128,8 +128,8 @@ export function applyListingFilters(
     includeCityFilter?: boolean;
     includeFreshnessFilter?: boolean;
     select?: string;
-    /** The visitor's saved / hidden listing ids. */
-    marks?: { favorites: string[]; hidden: string[] };
+    /** The visitor's saved, hidden, and in-progress listing ids. */
+    marks?: { favorites: string[]; hidden: string[]; pursuits?: Record<string, unknown> };
   },
 ): QueryLike {
   // PostgrestQueryBuilder (before .select()) has no .eq(); PostgrestFilterBuilder does.
@@ -143,7 +143,7 @@ export function applyListingFilters(
 
   // Saved listings stay visible past the age limit (flagged on the card if
   // gone); everything else must be recent and still online.
-  if (tab !== "favorites" && options?.includeFreshnessFilter !== false) {
+  if (tab !== "favorites" && tab !== "pursuing" && options?.includeFreshnessFilter !== false) {
     query = query
       .eq("is_active", true)
       .eq("price_outlier", false)
@@ -152,6 +152,7 @@ export function applyListingFilters(
 
   const favorites = options?.marks?.favorites ?? [];
   const hidden = options?.marks?.hidden ?? [];
+  const pursuing = Object.keys(options?.marks?.pursuits ?? {});
   const idList = (ids: string[]) => (ids.length > 0 ? ids : [NO_MATCH_ID]);
 
   if (tab === "hidden") {
@@ -162,6 +163,7 @@ export function applyListingFilters(
       query = query.gte("first_seen_at", daysAgoIso(1));
     }
     if (tab === "favorites") query = query.in("id", idList(favorites));
+    if (tab === "pursuing") query = query.in("id", idList(pursuing));
   }
 
   if (filters.postedWithin) {

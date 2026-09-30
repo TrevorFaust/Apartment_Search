@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import type { ListingRow } from "@/lib/supabase";
 import { formatFull, formatMonthDay } from "@/lib/dates";
 import { sourceLabel as labelForSource } from "@/lib/sources";
-import { toggleFavorite, toggleHidden } from "./actions";
+import type { MapPoint } from "@/lib/area-maps";
+import type { Pursuit } from "@/lib/marks";
+import { toggleFavorite, toggleHidden, updatePursuit } from "./actions";
 import { MapThumb } from "./map-thumb";
 
 export function ListingCard({
@@ -13,14 +15,19 @@ export function ListingCard({
   now,
   favorite,
   hidden,
+  pursuit,
+  mapPoint,
 }: {
   listing: ListingRow;
   index: number;
   now: number;
   favorite: boolean;
   hidden: boolean;
+  pursuit: Pursuit | null;
+  mapPoint: MapPoint | null;
 }) {
   const [pending, startTransition] = useTransition();
+  const [draft, setDraft] = useState<Pursuit | null>(pursuit);
   const [imageFailed, setImageFailed] = useState(false);
   const isNew = now - new Date(listing.first_seen_at).getTime() < 24 * 60 * 60 * 1000;
   const isGone = !listing.is_active;
@@ -72,14 +79,15 @@ export function ListingCard({
                 }
               }}
             />
-          ) : listing.latitude != null && listing.longitude != null ? (
+          ) : mapPoint ? (
             <MapThumb
-              lat={listing.latitude}
-              lng={listing.longitude}
-              label={listing.neighborhood ? `No photos · ${listing.neighborhood}` : "No photos posted"}
+              lat={mapPoint.lat}
+              lng={mapPoint.lng}
+              zoom={mapPoint.approximate ? 13 : 15}
+              label={mapPoint.label}
             />
           ) : (
-            <NoPhoto neighborhood={listing.neighborhood} />
+            <PlaceName name={listing.neighborhood || listing.city} />
           )}
           <div className="pointer-events-none absolute inset-0 bg-ink/0 transition-colors duration-300 group-hover:bg-ink/15" />
           <span className="pointer-events-none absolute bottom-3 right-3 translate-y-1 bg-ink/90 px-2.5 py-1.5 text-[11px] uppercase tracking-[0.18em] text-metal opacity-0 transition-all duration-300 ease-out-soft group-hover:translate-y-0 group-hover:opacity-100">
@@ -144,7 +152,29 @@ export function ListingCard({
           Listed <span className="text-ink">{formatMonthDay(listedAt)}</span>
         </p>
 
-        <div className="mt-auto flex gap-2 border-t border-ink/10 pt-3">
+        <PursuitFields
+          listingId={listing.id}
+          pursuit={draft}
+          pending={pending}
+          onChange={(next) => {
+            setDraft(next);
+            startTransition(() => updatePursuit(listing.id, next));
+          }}
+        />
+
+        {draft && (draft.messagedAt || draft.tourAt || draft.tourWith) && (
+          <p className="text-xs leading-relaxed text-brass">
+            {[
+              draft.messagedAt ? "Messaged" : null,
+              draft.tourAt ? `Tour ${formatFull(draft.tourAt)}` : null,
+              draft.tourWith,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+        )}
+
+        <div className="mt-auto flex flex-wrap gap-2 border-t border-ink/10 pt-3">
           <button
             // Browser autofill extensions inject attributes (fdprocessedid)
             // before hydration; ignore those mismatches.
@@ -174,6 +204,25 @@ export function ListingCard({
             className="press inline-flex min-h-11 items-center border border-ink/20 px-4 text-[11px] uppercase tracking-[0.16em] text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated disabled:opacity-50"
           >
             {hidden ? "Unhide" : "Hide"}
+          </button>
+          <button
+            suppressHydrationWarning
+            disabled={pending}
+            aria-pressed={draft != null}
+            onClick={() => {
+              const next = draft
+                ? null
+                : { messagedAt: null, tourAt: null, tourWith: null };
+              setDraft(next);
+              startTransition(() => updatePursuit(listing.id, next));
+            }}
+            className={`press inline-flex min-h-11 items-center border px-4 text-[11px] uppercase tracking-[0.16em] disabled:opacity-50 ${
+              draft
+                ? "border-ink bg-metal text-ink"
+                : "border-ink/20 text-ink-soft hover:border-ink hover:bg-ink hover:text-metal"
+            }`}
+          >
+            {draft ? "Tracking" : "Track"}
           </button>
         </div>
       </div>
@@ -208,20 +257,116 @@ function Star({ filled }: { filled: boolean }) {
   );
 }
 
-function NoPhoto({ neighborhood }: { neighborhood: string | null }) {
+function PlaceName({ name }: { name: string }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,var(--color-bg-elevated)_25%,transparent_25%,transparent_50%,var(--color-bg-elevated)_50%,var(--color-bg-elevated)_75%,transparent_75%)] bg-[length:18px_18px] bg-bg-deep text-ink-faint transition-colors group-hover:text-brass">
-      <svg viewBox="0 0 64 48" aria-hidden className="h-12 w-16 opacity-70">
-        <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
-          <path d="M6 44h52" />
-          <path d="M12 44V18l14-8 14 8v26" />
-          <path d="M40 44V26l12 6v12" />
-          <path d="M20 22h4M28 22h4M20 30h4M28 30h4M23 44v-7h6v7" />
-        </g>
-      </svg>
-      <span className="bg-bg-elevated/90 px-2 py-1 font-display text-sm italic">
-        {neighborhood ? `Photos not posted · ${neighborhood}` : "Photos not posted"}
-      </span>
+    <div className="flex h-full items-end bg-bg-deep p-4">
+      <p className="font-display text-2xl italic text-ink">{name}</p>
+    </div>
+  );
+}
+
+const TOUR_ZONE = "America/Los_Angeles";
+
+function tourParts(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: TOUR_ZONE,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(date);
+}
+
+function toLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = tourParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+/** Wall-clock tour time is Pacific, matching the other dates on the card. */
+function fromLocalInput(value: string): string | null {
+  if (!value) return null;
+  const guess = new Date(`${value}:00Z`);
+  if (Number.isNaN(guess.getTime())) return null;
+  const parts = tourParts(guess);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  const asShown = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
+  return new Date(guess.getTime() - (asShown - guess.getTime())).toISOString();
+}
+
+function PursuitFields({
+  listingId,
+  pursuit,
+  pending,
+  onChange,
+}: {
+  listingId: string;
+  pursuit: Pursuit | null;
+  pending: boolean;
+  onChange: (next: Pursuit | null) => void;
+}) {
+  if (!pursuit) return null;
+  const messaged = pursuit.messagedAt != null;
+  return (
+    <div className="mt-1 grid gap-2 border border-ink/15 bg-bg p-3">
+      <button
+        type="button"
+        suppressHydrationWarning
+        disabled={pending}
+        aria-pressed={messaged}
+        onClick={() =>
+          onChange({
+            ...pursuit,
+            messagedAt: messaged ? null : new Date().toISOString(),
+          })
+        }
+        className={`press min-h-11 border px-3 text-left text-xs uppercase tracking-[0.14em] ${
+          messaged
+            ? "border-ink bg-ink text-metal"
+            : "border-ink/20 text-ink-soft hover:border-ink"
+        }`}
+      >
+        {messaged ? "Messaged" : "Mark as messaged"}
+      </button>
+      <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.14em] text-brass">
+        Tour
+        <input
+          suppressHydrationWarning
+          type="datetime-local"
+          name={`tour-${listingId}`}
+          value={toLocalInput(pursuit.tourAt)}
+          onChange={(e) =>
+            onChange({
+              ...pursuit,
+              tourAt: fromLocalInput(e.target.value),
+            })
+          }
+          className="field-control normal-case tracking-normal"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.14em] text-brass">
+        With
+        <input
+          suppressHydrationWarning
+          type="text"
+          name={`with-${listingId}`}
+          defaultValue={pursuit.tourWith ?? ""}
+          placeholder="Leasing office, a name"
+          onBlur={(e) => {
+            const tourWith = e.target.value.trim();
+            if (tourWith === (pursuit.tourWith ?? "")) return;
+            onChange({ ...pursuit, tourWith: tourWith || null });
+          }}
+          className="field-control normal-case tracking-normal"
+        />
+      </label>
     </div>
   );
 }

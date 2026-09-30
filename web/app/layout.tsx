@@ -63,7 +63,7 @@ export default async function RootLayout({
           </div>
           <div className="h-0.5 bg-metal" />
           <div className="border-b border-ink/15">
-            <div className="mx-auto flex max-w-6xl items-end justify-between gap-6 px-6 py-5">
+            <div className="mx-auto flex max-w-6xl flex-col items-center px-6 py-8 text-center sm:py-10">
               <h1 className="m-0">
                 <Link
                   href="/"
@@ -75,15 +75,13 @@ export default async function RootLayout({
                     alt="Lease Locator"
                     width={583}
                     height={311}
-                    className="h-16 w-auto sm:h-24"
+                    className="h-28 w-auto sm:h-40"
                     priority
                   />
                 </Link>
               </h1>
-              <p className="mb-1 hidden text-right font-display text-3xl leading-[0.95] font-medium text-ink sm:block">
-                Places worth
-                <br />
-                <span className="italic text-brass">a second look.</span>
+              <p className="mt-4 font-display text-4xl leading-[0.95] font-medium text-ink sm:text-5xl">
+                Places worth <span className="italic text-brass">a second look.</span>
               </p>
             </div>
           </div>

@@ -9,6 +9,7 @@ import { PageStrip } from "./page-strip";
 import { FilterInput } from "./filter-input";
 import { SOURCE_OPTIONS } from "@/lib/sources";
 import { getViewer } from "@/lib/auth";
+import { resolveMapPoints } from "@/lib/area-maps";
 import { getMarks } from "@/lib/marks";
 import {
   applyListingFilters,
@@ -38,8 +39,24 @@ const TABS = [
   { id: "all", label: "All" },
   { id: "new", label: "New (24h)" },
   { id: "favorites", label: "Favorites" },
+  { id: "pursuing", label: "Pursuing" },
   { id: "hidden", label: "Hidden" },
 ] as const;
+
+function leadPlace(listing: ListingRow | undefined): string | null {
+  if (!listing) return null;
+  const raw = (listing.neighborhood?.trim() || listing.city).split(",")[0]?.trim() || listing.city;
+  return raw.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function leadDetail(listing: ListingRow): string {
+  return [
+    listing.bedrooms != null ? `${listing.bedrooms} bed` : null,
+    listing.price != null ? `$${listing.price.toLocaleString("en-US")}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 
 export default async function ListingsPage({
   searchParams,
@@ -139,6 +156,7 @@ export default async function ListingsPage({
     }
 
     totalCount = count ?? 0;
+
     const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
     const safePage = Math.min(page, totalPages);
     const offset = (safePage - 1) * PAGE_SIZE;
@@ -171,8 +189,8 @@ export default async function ListingsPage({
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const showingFrom = totalCount === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const showingTo = Math.min(safePage * PAGE_SIZE, totalCount);
+  const mapPoints = await resolveMapPoints(listings);
+  const pursuingCount = Object.keys(marks.pursuits).length;
 
   const tabHref = (id: string) => {
     const qs = buildFilterQueryString(filters, { tab: id, page: "1" });
@@ -186,32 +204,38 @@ export default async function ListingsPage({
 
   return (
     <div className="rise">
-      <div className="mb-8 flex flex-col gap-6 border-b border-ink/15 pb-6 md:flex-row md:items-end md:justify-between">
+      <div className="mb-8 border-b border-ink/15 pb-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-brass">Open listings</p>
-          <p className="mt-2 font-display text-5xl leading-none font-medium tracking-tight text-ink tabular-nums sm:text-6xl">
-            {totalCount.toLocaleString()}
+          <p className="text-xs uppercase tracking-[0.32em] text-brass">Newest on the board</p>
+          <p className="mt-2 font-display text-4xl leading-none font-medium tracking-tight text-ink sm:text-5xl">
+            {leadPlace(listings[0]) ?? "Quiet for now"}
           </p>
-          <p className="mt-3 max-w-sm text-sm leading-relaxed text-ink-soft">
-            {totalCount === 0
-              ? "Nothing matches. Widen a filter and keep looking."
-              : `Showing ${showingFrom}–${showingTo}, still on the market.`}
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
+            {listings[0]
+              ? `${leadDetail(listings[0]) ? `${leadDetail(listings[0])}. ` : ""}Scroll for the rest, and track a place once you message or book a tour.`
+              : filters.tab === "pursuing"
+                ? "Track a place from the board once you message the owner or book a tour."
+                : "Nothing matches these filters. Widen them, or check back in the morning."}
           </p>
         </div>
-        <div className="flex flex-col items-start gap-3 md:items-end">
+        <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap border border-ink/20 bg-bg-elevated">
             {TABS.map((t) => (
               <Link
                 key={t.id}
                 href={tabHref(t.id)}
                 aria-current={filters.tab === t.id ? "page" : undefined}
-                className={`press inline-flex min-h-11 items-center px-4 text-xs uppercase tracking-[0.14em] ${
+                className={`press inline-flex min-h-11 items-center px-3 text-xs uppercase tracking-[0.12em] sm:px-4 sm:tracking-[0.14em] ${
                   filters.tab === t.id
                     ? "bg-ink text-bg-elevated"
                     : "text-ink-soft hover:bg-accent-wash hover:text-ink"
                 }`}
               >
-                <LinkPending>{t.label}</LinkPending>
+                <LinkPending>
+                  {t.id === "pursuing" && pursuingCount > 0
+                    ? `Pursuing ${pursuingCount}`
+                    : t.label}
+                </LinkPending>
               </Link>
             ))}
           </div>
@@ -320,11 +344,12 @@ export default async function ListingsPage({
       {totalCount === 0 ? (
         <div className="sheet px-8 py-20 text-center">
           <p className="font-display text-4xl italic text-ink">
-            Nothing here yet.
+            {filters.tab === "pursuing" ? "Nothing in pursuit." : "Nothing here yet."}
           </p>
           <p className="mt-2 text-sm text-ink-faint">
-            Try widening the filters. New listings arrive with each morning&apos;s
-            scrape.
+            {filters.tab === "pursuing"
+              ? "Track a listing when you message the owner or book a tour. It stays on this tab."
+              : "Try widening the filters. New listings arrive with each morning\u2019s scrape."}
           </p>
         </div>
       ) : (
@@ -338,6 +363,8 @@ export default async function ListingsPage({
                 now={now}
                 favorite={favoriteIds.has(l.id)}
                 hidden={hiddenIds.has(l.id)}
+                pursuit={marks.pursuits[l.id] ?? null}
+                mapPoint={mapPoints.get(l.id) ?? null}
               />
             ))}
           </div>

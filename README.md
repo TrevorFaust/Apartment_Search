@@ -4,7 +4,11 @@ Personal apartment-hunting pipeline: scrapes listings once a day, stores them
 in Supabase, emails you a newsletter of anything new in the last 24 hours, and
 gives you a small web app ([leaselocator.vercel.app](https://leaselocator.vercel.app))
 to browse, filter, sort, and favorite listings. Visitors can optionally sign in
-to get their own daily or weekly email alerts for any US city.
+to get their own daily or weekly email alerts for any US city. Cards without a
+photo show a map of the listing's pin, or of the neighborhood when Craigslist
+only has a general area. Track a place you are pursuing to record whether you
+messaged them, plus a tour time and who it is with; those listings live on the
+Pursuing tab.
 
 The list is meant for finding overlooked gems, not an ever-growing archive:
 only listings posted in the last **60 days** that are **still online** show up.
