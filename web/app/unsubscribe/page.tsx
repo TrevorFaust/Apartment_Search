@@ -13,10 +13,10 @@ export default async function UnsubscribePage({
   const { token, done } = await searchParams;
 
   return (
-    <div className="rise mx-auto max-w-md rounded-[2rem] border border-line/70 bg-bg-elevated p-8 text-center shadow-lift">
+    <div className="sheet rise mx-auto max-w-md p-8 text-center">
       {done ? (
         <>
-          <h2 className="font-display text-2xl font-semibold">You&apos;re unsubscribed</h2>
+          <h2 className="font-display text-3xl font-medium">You&apos;re unsubscribed</h2>
           <p className="mt-2 text-sm text-ink-soft">
             No more alert emails. You can turn them back on from your Profile anytime.
           </p>
@@ -24,14 +24,14 @@ export default async function UnsubscribePage({
       ) : typeof token === "string" ? (
         <form action={unsubscribe} className="space-y-4">
           <input type="hidden" name="token" value={token} />
-          <h2 className="font-display text-2xl font-semibold">Stop alert emails?</h2>
+          <h2 className="font-display text-3xl font-medium">Stop alert emails?</h2>
           <p className="text-sm text-ink-soft">
             You&apos;ll stop getting new-apartment emails from Lease Locator.
           </p>
           <button
             suppressHydrationWarning
             type="submit"
-            className="press w-full rounded-full bg-ink py-3 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow"
+            className="press w-full min-h-11 bg-ink py-3 text-xs uppercase tracking-[0.16em] text-metal hover:bg-metal hover:text-ink"
           >
             Unsubscribe
           </button>
@@ -41,7 +41,7 @@ export default async function UnsubscribePage({
       )}
       <Link
         href="/"
-        className="mt-5 inline-block text-sm text-accent underline-offset-2 transition-colors hover:text-accent-dim hover:underline"
+        className="mt-5 inline-block text-sm text-brass underline-offset-4 transition-colors hover:text-ink hover:underline"
       >
         Back to listings
       </Link>

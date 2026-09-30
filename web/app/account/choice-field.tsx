@@ -39,10 +39,10 @@ export function ChoiceField({
               setValue(c.value);
               setCustom("");
             }}
-            className={`press select-none rounded-full border px-4 py-2 text-sm ${
+            className={`press min-h-11 select-none border px-4 py-2 text-sm ${
               on
-                ? "border-accent bg-accent text-bg-elevated shadow-glow"
-                : "border-ink/15 bg-bg text-ink-soft hover:border-accent/50 hover:bg-accent-wash hover:text-accent-dim"
+                ? "border-ink bg-ink text-metal"
+                : "border-ink/20 bg-bg text-ink-soft hover:border-ink hover:bg-accent-wash hover:text-ink"
             }`}
           >
             {c.label}
@@ -51,8 +51,8 @@ export function ChoiceField({
       })}
       {exact && (
         <label
-          className={`flex items-center gap-1.5 rounded-full border py-1 pl-3 pr-1 text-sm transition-colors ${
-            usingCustom ? "border-accent bg-accent-wash text-accent-dim" : "border-ink/15 text-ink-soft"
+          className={`flex min-h-11 items-center gap-1.5 border py-1 pr-1 pl-3 text-sm transition-colors ${
+            usingCustom ? "border-brass bg-accent-wash text-brass" : "border-ink/20 text-ink-soft"
           }`}
         >
           <span className="text-xs">{exact.label}</span>
@@ -70,7 +70,7 @@ export function ChoiceField({
               setValue(next);
             }}
             placeholder="—"
-            className="w-20 rounded-full bg-bg-elevated px-2 py-1 text-sm tabular-nums outline-none"
+            className="w-20 bg-bg-elevated px-2 py-1 text-sm tabular-nums outline-none"
           />
           {exact.suffix && <span className="pr-2 text-xs">{exact.suffix}</span>}
         </label>

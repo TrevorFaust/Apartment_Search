@@ -101,7 +101,7 @@ export function AlertsForm({
       <button
         suppressHydrationWarning
         type="submit"
-        className="press w-full rounded-full bg-accent py-3.5 text-sm font-medium text-bg-elevated shadow-glow hover:bg-accent-dim"
+        className="press w-full min-h-11 bg-ink py-3.5 text-xs uppercase tracking-[0.18em] text-metal hover:bg-metal hover:text-ink"
       >
         {submitLabel}
       </button>

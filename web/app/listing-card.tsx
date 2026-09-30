@@ -42,25 +42,26 @@ export function ListingCard({
 
   return (
     <article
-      className={`rise group relative flex flex-col overflow-hidden rounded-3xl border border-line/70 bg-bg-elevated shadow-soft transition-[transform,box-shadow,border-color] duration-300 ease-out-soft hover:-translate-y-1 hover:border-accent/40 hover:shadow-lift ${
+      className={`rise group relative z-0 flex flex-col bg-bg-elevated transition-[transform,box-shadow] duration-300 ease-out-soft hover:z-10 hover:-translate-y-1 hover:shadow-lift ${
         isGone ? "opacity-70 hover:opacity-100" : ""
       }`}
-      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+      style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
     >
+      <Corners />
       <a
         href={listing.url}
         target="_blank"
         rel="noreferrer"
-        className="relative block p-2 pb-0"
+        className="relative block"
         aria-label={`Open ${listing.title} on ${sourceLabel}`}
       >
-        <div className="relative h-44 overflow-hidden rounded-[1.1rem] bg-bg-deep">
+        <div className="relative aspect-[4/3] overflow-hidden bg-bg-deep">
           {listing.image_url?.startsWith("http") && !imageFailed ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={listing.image_url}
               alt=""
-              className="h-full w-full object-cover transition-transform duration-500 ease-out-soft group-hover:scale-105"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out-soft group-hover:scale-[1.04]"
               loading="lazy"
               referrerPolicy="no-referrer"
               onError={() => setImageFailed(true)}
@@ -80,17 +81,17 @@ export function ListingCard({
           ) : (
             <NoPhoto neighborhood={listing.neighborhood} />
           )}
-          <div className="pointer-events-none absolute inset-0 bg-ink/0 transition-colors duration-300 group-hover:bg-ink/10" />
-          <span className="pointer-events-none absolute bottom-2.5 right-2.5 translate-y-1 rounded-full bg-bg-elevated/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-accent-dim opacity-0 shadow-soft backdrop-blur transition-all duration-300 ease-out-soft group-hover:translate-y-0 group-hover:opacity-100">
-            View on {sourceLabel} ↗
+          <div className="pointer-events-none absolute inset-0 bg-ink/0 transition-colors duration-300 group-hover:bg-ink/15" />
+          <span className="pointer-events-none absolute bottom-3 right-3 translate-y-1 bg-ink/90 px-2.5 py-1.5 text-[11px] uppercase tracking-[0.18em] text-metal opacity-0 transition-all duration-300 ease-out-soft group-hover:translate-y-0 group-hover:opacity-100">
+            View on {sourceLabel}
           </span>
           {isGone ? (
-            <span className="absolute left-2.5 top-2.5 rounded-full bg-ink/85 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-bg-elevated backdrop-blur">
-              No longer listed
+            <span className="absolute left-3 top-3 bg-ink px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-bg-elevated">
+              Taken down
             </span>
           ) : (
             isNew && (
-              <span className="absolute left-2.5 top-2.5 rounded-full bg-accent px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-bg-elevated shadow-glow">
+              <span className="absolute left-3 top-3 bg-metal px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-ink">
                 New
               </span>
             )
@@ -98,12 +99,12 @@ export function ListingCard({
         </div>
       </a>
 
-      <div className="flex flex-1 flex-col gap-1.5 px-5 pb-5 pt-4">
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="font-display text-xl font-semibold text-accent">
+      <div className="flex flex-1 flex-col gap-2 px-4 pt-4 pb-4">
+        <div className="flex items-end justify-between gap-3 border-b border-metal/70 pb-2">
+          <span className="font-display text-[2rem] leading-none font-medium tracking-tight text-ink tabular-nums">
             {listing.price != null ? `$${listing.price.toLocaleString()}` : "—"}
           </span>
-          <span className="text-[10px] uppercase tracking-widest text-ink-faint">
+          <span className="mb-1 text-[11px] uppercase tracking-[0.2em] text-brass">
             {sourceLabel}
           </span>
         </div>
@@ -111,27 +112,39 @@ export function ListingCard({
           href={listing.url}
           target="_blank"
           rel="noreferrer"
-          className="font-display text-base leading-snug decoration-accent/60 underline-offset-2 transition-colors hover:text-accent hover:underline"
+          className="font-display text-lg leading-snug font-medium decoration-brass underline-offset-4 transition-colors hover:text-brass hover:underline"
         >
           {listing.title}
         </a>
-        <p className="text-xs text-ink-soft">
-          {facts.join(" · ")}
-          {facts.length > 0 && listing.neighborhood ? " · " : ""}
-          {listing.neighborhood ?? ""}
-        </p>
+        {(facts.length > 0 || listing.neighborhood) && (
+          <div className="flex flex-wrap gap-1.5">
+            {facts.map((fact) => (
+              <span
+                key={fact}
+                className="border border-ink/15 px-2 py-1 text-[11px] uppercase tracking-[0.14em] text-ink-soft"
+              >
+                {fact}
+              </span>
+            ))}
+            {listing.neighborhood && (
+              <span className="border border-brass/40 px-2 py-1 text-[11px] uppercase tracking-[0.14em] text-brass">
+                {listing.neighborhood}
+              </span>
+            )}
+          </div>
+        )}
         {listing.address && (
-          <p className="text-xs text-ink-faint">{listing.address}</p>
+          <p className="text-xs leading-relaxed text-ink-faint">{listing.address}</p>
         )}
 
         <p
           title={`${listedHint}: ${formatFull(listedAt)}`}
-          className="mt-1 w-fit cursor-help rounded-full bg-bg-deep/60 px-2.5 py-0.5 text-[11px] text-ink-faint transition-colors hover:bg-accent-wash hover:text-accent-dim"
+          className="w-fit cursor-help text-[11px] uppercase tracking-[0.16em] text-ink-faint"
         >
-          Listed <span className="font-medium text-ink-soft">{formatMonthDay(listedAt)}</span>
+          Listed <span className="text-ink">{formatMonthDay(listedAt)}</span>
         </p>
 
-        <div className="mt-auto flex gap-2 pt-4">
+        <div className="mt-auto flex gap-2 border-t border-ink/10 pt-3">
           <button
             // Browser autofill extensions inject attributes (fdprocessedid)
             // before hydration; ignore those mismatches.
@@ -143,13 +156,14 @@ export function ListingCard({
                 toggleFavorite(listing.id, !favorite),
               )
             }
-            className={`press flex-1 rounded-full border px-3 py-1.5 text-xs disabled:opacity-50 ${
+            className={`press inline-flex min-h-11 flex-1 items-center justify-center gap-2 border px-3 text-[11px] uppercase tracking-[0.16em] disabled:opacity-50 ${
               favorite
-                ? "border-accent bg-accent text-bg-elevated shadow-glow hover:border-accent-dim hover:bg-accent-dim"
-                : "border-ink/15 bg-bg hover:border-accent/50 hover:bg-accent-wash hover:text-accent-dim"
+                ? "border-ink bg-ink text-metal hover:bg-brass hover:text-bg-elevated"
+                : "border-ink/20 bg-bg-elevated text-ink hover:border-ink hover:bg-ink hover:text-metal"
             }`}
           >
-            {pending ? "…" : favorite ? "★ Saved" : "☆ Save"}
+            <Star filled={favorite} />
+            {pending ? "Saving" : favorite ? "Saved" : "Save"}
           </button>
           <button
             suppressHydrationWarning
@@ -157,7 +171,7 @@ export function ListingCard({
             onClick={() =>
               startTransition(() => toggleHidden(listing.id, !hidden))
             }
-            className="press rounded-full border border-ink/15 bg-bg px-4 py-1.5 text-xs text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated disabled:opacity-50"
+            className="press inline-flex min-h-11 items-center border border-ink/20 px-4 text-[11px] uppercase tracking-[0.16em] text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated disabled:opacity-50"
           >
             {hidden ? "Unhide" : "Hide"}
           </button>
@@ -167,9 +181,36 @@ export function ListingCard({
   );
 }
 
+function Corners() {
+  const arm =
+    "pointer-events-none absolute z-10 h-3.5 w-3.5 border-metal opacity-0 transition-opacity duration-300 group-hover:opacity-100";
+  return (
+    <>
+      <span aria-hidden className={`${arm} top-2 left-2 border-t border-l`} />
+      <span aria-hidden className={`${arm} top-2 right-2 border-t border-r`} />
+      <span aria-hidden className={`${arm} bottom-2 left-2 border-b border-l`} />
+      <span aria-hidden className={`${arm} right-2 bottom-2 border-r border-b`} />
+    </>
+  );
+}
+
+function Star({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden className="size-3.5">
+      <path
+        d="M8 1.2 9.7 6h4.9L11.1 8.9 12.7 14 8 11.1 3.3 14l1.6-5.1L1.4 6h4.9Z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinejoin="miter"
+      />
+    </svg>
+  );
+}
+
 function NoPhoto({ neighborhood }: { neighborhood: string | null }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 bg-[radial-gradient(120%_90%_at_30%_10%,var(--color-bg-elevated),var(--color-bg-deep))] text-ink-faint transition-colors group-hover:text-accent">
+    <div className="flex h-full flex-col items-center justify-center gap-2 bg-[linear-gradient(135deg,var(--color-bg-elevated)_25%,transparent_25%,transparent_50%,var(--color-bg-elevated)_50%,var(--color-bg-elevated)_75%,transparent_75%)] bg-[length:18px_18px] bg-bg-deep text-ink-faint transition-colors group-hover:text-brass">
       <svg viewBox="0 0 64 48" aria-hidden className="h-12 w-16 opacity-70">
         <g fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round">
           <path d="M6 44h52" />
@@ -178,7 +219,7 @@ function NoPhoto({ neighborhood }: { neighborhood: string | null }) {
           <path d="M20 22h4M28 22h4M20 30h4M28 30h4M23 44v-7h6v7" />
         </g>
       </svg>
-      <span className="font-display text-sm italic">
+      <span className="bg-bg-elevated/90 px-2 py-1 font-display text-sm italic">
         {neighborhood ? `Photos not posted · ${neighborhood}` : "Photos not posted"}
       </span>
     </div>

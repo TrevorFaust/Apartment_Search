@@ -2,22 +2,24 @@
 
 @theme {
   --color-bg: #e6e3db;
-  --color-bg-elevated: #efece5;
-  --color-bg-deep: #d9d4c8;
-  --color-ink: #1a1c18;
-  --color-ink-soft: #4a4e45;
-  --color-ink-faint: #6f7468;
-  --color-line: #cfc9bc;
-  --color-accent: #3d6f5f;
-  --color-accent-soft: #52897a;
-  --color-accent-dim: #2f5649;
-  --color-accent-wash: rgb(61 111 95 / 0.12);
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --font-body: var(--font-franklin), "Helvetica Neue", sans-serif;
+  --color-bg-elevated: #f7f4ee;
+  --color-bg-deep: #d4cec2;
+  --color-ink: #161412;
+  --color-ink-soft: #3f3a34;
+  --color-ink-faint: #5c564e;
+  --color-line: #cfc6b6;
+  --color-accent: #161412;
+  --color-accent-soft: #3c3832;
+  --color-accent-dim: #161412;
+  --color-accent-wash: rgb(198 161 91 / 0.2);
+  --color-brass: #6e5220;
+  --color-metal: #c6a15b;
+  --font-display: var(--font-bodoni), "Times New Roman", serif;
+  --font-body: var(--font-outfit), "Helvetica Neue", sans-serif;
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
-  --shadow-soft: 0 1px 2px rgb(26 28 24 / 0.05), 0 8px 20px -10px rgb(26 28 24 / 0.18);
-  --shadow-lift: 0 2px 6px rgb(26 28 24 / 0.06), 0 22px 40px -18px rgb(47 86 73 / 0.42);
-  --shadow-glow: 0 10px 24px -10px rgb(61 111 95 / 0.6);
+  --shadow-soft: 0 1px 0 rgb(22 20 18 / 0.06), 0 16px 30px -20px rgb(22 20 18 / 0.35);
+  --shadow-lift: 0 18px 40px -18px rgb(22 20 18 / 0.45);
+  --shadow-glow: 0 10px 24px -12px rgb(198 161 91 / 0.85);
 }
 
 @layer base {
@@ -26,22 +28,12 @@
     color: var(--color-ink);
     font-family: var(--font-body);
     background-image:
-      radial-gradient(1100px 520px at 8% -12%, rgb(61 111 95 / 0.1), transparent 60%),
-      radial-gradient(800px 420px at 100% 0%, rgb(120 90 50 / 0.05), transparent 55%);
+      linear-gradient(to right, rgb(22 20 18 / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(22 20 18 / 0.045) 1px, transparent 1px);
+    background-size: 48px 48px;
     background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
-  }
-
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0.08;
-    mix-blend-mode: multiply;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 220px 220px;
+    touch-action: manipulation;
   }
 
   a,
@@ -57,12 +49,12 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-brass);
     outline-offset: 3px;
   }
 
   ::selection {
-    background: var(--color-accent);
+    background: var(--color-brass);
     color: var(--color-bg-elevated);
   }
 }
@@ -70,37 +62,44 @@
 @layer components {
   /* Shared affordance for every text input / select: darkens on hover, rings on focus. */
   .field-control {
-    border: 1px solid rgb(26 28 24 / 0.14);
-    border-radius: 0.875rem;
+    min-height: 2.75rem;
+    border: 1px solid rgb(22 20 18 / 0.22);
+    border-radius: 0;
     background-color: var(--color-bg-elevated);
-    padding: 0.5rem 0.875rem;
+    padding: 0.625rem 0.75rem;
     font-size: 0.875rem;
     color: var(--color-ink);
-    box-shadow: inset 0 1px 2px rgb(26 28 24 / 0.04);
     transition:
-      border-color 150ms,
-      box-shadow 200ms,
-      background-color 150ms;
+      border-color 180ms,
+      box-shadow 180ms,
+      background-color 180ms;
   }
 
   .field-control:hover {
-    border-color: rgb(61 111 95 / 0.45);
-    background-color: #f5f3ee;
+    border-color: var(--color-brass);
+    background-color: #fffdf8;
   }
 
   .field-control:focus {
     outline: none;
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 4px var(--color-accent-wash);
+    border-color: var(--color-brass);
+    box-shadow: 0 0 0 3px var(--color-accent-wash);
   }
 
-  /* Tactile press for anything clickable. */
+  /* Panel with a brass rule along the top edge. */
+  .sheet {
+    border: 1px solid rgb(22 20 18 / 0.14);
+    border-top: 2px solid var(--color-metal);
+    background-color: var(--color-bg-elevated);
+    box-shadow: var(--shadow-soft);
+  }
+
   .press {
     transition:
       transform 180ms var(--ease-out-soft),
-      background-color 150ms,
-      border-color 150ms,
-      color 150ms,
+      background-color 180ms,
+      border-color 180ms,
+      color 180ms,
       box-shadow 180ms var(--ease-out-soft);
   }
 
@@ -116,7 +115,7 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -125,7 +124,7 @@
 }
 
 .rise {
-  animation: rise 0.45s ease-out both;
+  animation: rise 0.5s var(--ease-out-soft) both;
 }
 
 @keyframes progress {

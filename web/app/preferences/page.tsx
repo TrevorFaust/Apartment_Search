@@ -26,7 +26,7 @@ export default async function PreferencesPage() {
 
   if (error) {
     return (
-      <p className="rounded-2xl border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
+      <p className="border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
         Couldn&apos;t load preferences: {error.message}
       </p>
     );
@@ -70,8 +70,8 @@ export default async function PreferencesPage() {
 
   return (
     <div className="rise mx-auto max-w-2xl">
-      <h2 className="font-display text-3xl font-semibold">
-        Scraper <span className="italic font-normal text-accent">settings</span>
+      <h2 className="font-display text-4xl font-medium">
+        Scraper <span className="italic text-brass">settings</span>
       </h2>
       <p className="mt-1 mb-8 text-sm text-ink-soft">
         These drive the scraper&apos;s search areas, radius filter, and the
@@ -80,7 +80,7 @@ export default async function PreferencesPage() {
 
       <form
         action={savePreferences}
-        className="space-y-6 rounded-3xl border border-line/70 bg-bg-elevated p-7 shadow-soft"
+        className="sheet space-y-6 p-7"
       >
         <Section title="Where">
           <LocationsEditor initialLocations={locations} />
@@ -155,7 +155,7 @@ export default async function PreferencesPage() {
         <button
           suppressHydrationWarning
           type="submit"
-          className="press w-full rounded-full bg-ink py-3 text-sm uppercase tracking-[0.2em] text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow"
+          className="press w-full min-h-11 bg-ink py-3 text-xs uppercase tracking-[0.2em] text-metal hover:bg-metal hover:text-ink"
         >
           Save preferences
         </button>
@@ -173,7 +173,7 @@ function Section({
 }) {
   return (
     <fieldset>
-      <legend className="mb-3 w-full font-display text-lg italic text-ink-soft">
+      <legend className="mb-3 w-full border-b border-metal/50 pb-1 font-display text-lg italic text-brass">
         {title}
       </legend>
       {children}
@@ -198,7 +198,7 @@ function Field({
   amount?: "whole" | "decimal";
 }) {
   return (
-    <label className="flex flex-col gap-1 text-[10px] uppercase tracking-widest text-ink-soft">
+    <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.16em] text-brass">
       {label}
       {amount ? (
         <AmountInput

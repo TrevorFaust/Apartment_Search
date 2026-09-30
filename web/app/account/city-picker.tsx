@@ -91,14 +91,14 @@ export function CityPicker({
           {picked.map((l) => (
             <span
               key={l.city}
-              className="flex items-center gap-1 rounded-full bg-accent py-1 pl-3 pr-1 text-sm text-bg-elevated shadow-glow"
+              className="flex min-h-11 items-center gap-1 bg-ink py-1 pr-1 pl-3 text-sm text-metal"
             >
               {display(l)}
               <button
                 type="button"
                 aria-label={`Remove ${display(l)}`}
                 onClick={() => setPicked((prev) => prev.filter((p) => p.city !== l.city))}
-                className="flex size-5 items-center justify-center rounded-full text-xs hover:bg-bg-elevated/25"
+                className="flex size-8 items-center justify-center text-sm hover:bg-bg-elevated/25"
               >
                 ×
               </button>
@@ -138,7 +138,7 @@ export function CityPicker({
         </div>
 
         {open && text.trim().length >= 2 && (
-          <ul className="rise absolute left-0 right-0 top-full z-30 mt-1.5 rounded-2xl border border-line/80 bg-bg-elevated p-1.5 shadow-lift [animation-duration:160ms]">
+          <ul className="rise absolute top-full right-0 left-0 z-30 mt-1.5 border border-ink/20 bg-bg-elevated p-1.5 shadow-lift [animation-duration:160ms]">
             {suggestions.map((s, i) => (
               <li key={`${s.city}-${s.state}`}>
                 <button
@@ -146,7 +146,7 @@ export function CityPicker({
                   onMouseDown={(e) => e.preventDefault()}
                   onMouseEnter={() => setHighlight(i)}
                   onClick={() => add(toLocation(s))}
-                  className={`block w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${
+                  className={`block min-h-11 w-full px-3 py-2 text-left text-sm transition-colors ${
                     i === highlight ? "bg-accent-wash text-accent-dim" : ""
                   }`}
                 >
@@ -175,7 +175,7 @@ export function CityPicker({
                 key={c.city}
                 type="button"
                 onClick={() => add({ city: c.city, state: c.state })}
-                className="press rounded-full border border-dashed border-ink/25 px-3 py-1 text-xs text-ink-soft hover:border-solid hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+                className="press inline-flex min-h-11 items-center border border-dashed border-ink/25 px-3 text-xs uppercase tracking-[0.12em] text-ink-soft hover:border-solid hover:border-brass hover:bg-accent-wash hover:text-brass"
               >
                 + {titleWords(c.city)} · {c.count.toLocaleString()} listings
               </button>

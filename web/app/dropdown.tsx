@@ -64,7 +64,7 @@ export function Dropdown({
         <div
           role="listbox"
           aria-labelledby={labelId}
-          className={`rise absolute top-full z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden rounded-2xl border border-line/80 bg-bg-elevated p-1.5 shadow-lift [animation-duration:160ms] ${
+          className={`rise absolute top-full z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[min(22rem,calc(100vw-2rem))] overflow-y-auto overflow-x-hidden border border-ink/20 bg-bg-elevated p-1.5 shadow-lift [animation-duration:160ms] ${
             inline ? "right-0" : "left-0"
           }`}
         >
@@ -89,8 +89,8 @@ export function FieldLabel({
 }) {
   const Text = htmlFor ? "label" : "span";
   return (
-    <span className="flex min-h-4 items-center justify-between gap-2 pl-1">
-      <Text id={id} htmlFor={htmlFor} className="text-[10px] uppercase tracking-widest text-ink-soft">
+    <span className="flex min-h-5 items-center justify-between gap-2">
+      <Text id={id} htmlFor={htmlFor} className="text-xs uppercase tracking-[0.18em] text-brass">
         {label}
       </Text>
       {onClear && (
@@ -99,7 +99,7 @@ export function FieldLabel({
           onClick={onClear}
           aria-label={`Clear ${label}`}
           title={`Clear ${label}`}
-          className="press flex size-4 items-center justify-center rounded-full bg-ink/10 text-[10px] leading-none text-ink-soft hover:bg-accent hover:text-bg-elevated"
+          className="press flex size-5 items-center justify-center bg-ink/10 text-xs leading-none text-ink-soft hover:bg-ink hover:text-metal"
         >
           ×
         </button>
@@ -141,7 +141,7 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 export const OPTION_ROW =
-  "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-accent-dim";
+  "flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-ink";
 
 /** Submits the form that contains `el` after React has flushed pending state. */
 export function submitClosestForm(el: Element | null) {

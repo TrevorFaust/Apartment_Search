@@ -1,19 +1,15 @@
 export default function Loading() {
   return (
     <div className="rise">
-      <div className="mb-6 flex w-fit gap-1 rounded-full border border-line/70 bg-bg-elevated/70 p-1">
-        <div className="h-8 w-16 rounded-full bg-ink/10" />
-        <div className="h-8 w-24 rounded-full bg-ink/5" />
-        <div className="h-8 w-24 rounded-full bg-ink/5" />
+      <div className="mb-8 border-b border-ink/15 pb-6">
+        <div className="h-3 w-28 bg-brass/30" />
+        <div className="mt-3 h-14 w-24 bg-ink/10" />
       </div>
-      <div className="mb-8 h-28 rounded-3xl border border-line/70 bg-bg-elevated/60" />
-      <p className="font-display text-2xl italic text-ink-soft">Looking…</p>
-      <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="sheet mb-8 h-36" />
+      <p className="font-display text-3xl italic text-ink">Looking…</p>
+      <div className="mt-8 grid gap-px bg-ink/20 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
-          <div
-            key={i}
-            className="h-72 animate-pulse rounded-3xl border border-line/70 bg-bg-elevated shadow-soft"
-          />
+          <div key={i} className="h-96 animate-pulse bg-bg-elevated" />
         ))}
       </div>
     </div>

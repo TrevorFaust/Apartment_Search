@@ -80,13 +80,13 @@ export function PageStrip({
           ←
         </StepLink>
 
-        <div className="relative flex min-w-0 rounded-full border border-line/70 bg-bg-elevated p-1 shadow-soft">
+        <div className="relative flex min-w-0 border border-ink/20 bg-bg-elevated p-1">
           {overflows && (
             <button
               type="button"
               aria-label="Scroll page numbers left"
               onClick={() => nudge(-1)}
-              className="absolute inset-y-1 left-1 z-10 hidden w-8 items-center justify-center rounded-full bg-bg-elevated/90 text-ink-faint transition-colors hover:text-accent sm:flex"
+              className="absolute inset-y-1 left-1 z-10 hidden w-11 items-center justify-center bg-bg-elevated/95 text-ink-faint transition-colors hover:text-brass sm:flex"
             >
               ‹
             </button>
@@ -136,10 +136,10 @@ export function PageStrip({
                   href={href(p)}
                   draggable={false}
                   aria-current={isCurrent ? "page" : undefined}
-                  className={`flex h-9 min-w-9 shrink-0 select-none items-center justify-center rounded-full px-2.5 text-sm tabular-nums transition-[background-color,color,transform,box-shadow] duration-200 ease-out-soft ${
+                  className={`flex h-11 min-w-11 shrink-0 select-none items-center justify-center px-2.5 text-sm tabular-nums transition-[background-color,color,transform] duration-200 ease-out-soft ${
                     isCurrent
-                      ? "bg-accent font-semibold text-bg-elevated shadow-glow"
-                      : "text-ink-soft hover:-translate-y-0.5 hover:bg-accent-wash hover:text-accent-dim"
+                      ? "bg-ink font-medium text-metal"
+                      : "text-ink-soft hover:-translate-y-0.5 hover:bg-accent-wash hover:text-ink"
                   }`}
                 >
                   <LinkPending>{p}</LinkPending>
@@ -152,7 +152,7 @@ export function PageStrip({
               type="button"
               aria-label="Scroll page numbers right"
               onClick={() => nudge(1)}
-              className="absolute inset-y-1 right-1 z-10 hidden w-8 items-center justify-center rounded-full bg-bg-elevated/90 text-ink-faint transition-colors hover:text-accent sm:flex"
+              className="absolute inset-y-1 right-1 z-10 hidden w-11 items-center justify-center bg-bg-elevated/95 text-ink-faint transition-colors hover:text-brass sm:flex"
             >
               ›
             </button>
@@ -181,7 +181,7 @@ function StepLink({
   children: React.ReactNode;
 }) {
   const base =
-    "flex size-11 shrink-0 items-center justify-center rounded-full border text-base";
+    "flex size-11 shrink-0 items-center justify-center border text-base";
   if (!href) {
     return (
       <span aria-disabled className={`${base} cursor-not-allowed border-ink/10 text-ink-faint/60`}>
@@ -193,7 +193,7 @@ function StepLink({
     <Link
       href={href}
       aria-label={label}
-      className={`${base} press border-line/70 bg-bg-elevated shadow-soft hover:border-accent/50 hover:bg-accent-wash hover:text-accent-dim hover:shadow-lift`}
+      className={`${base} press border-ink/20 bg-bg-elevated hover:border-ink hover:bg-ink hover:text-metal`}
     >
       <LinkPending>{children}</LinkPending>
     </Link>

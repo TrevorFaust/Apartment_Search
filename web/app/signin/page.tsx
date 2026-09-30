@@ -9,10 +9,10 @@ export default async function SignInPage() {
 
   return (
     <div className="rise mx-auto max-w-md">
-      <div className="rounded-[2rem] border border-line/70 bg-bg-elevated p-8 shadow-lift">
-        <p className="text-[11px] uppercase tracking-[0.3em] text-accent">Optional</p>
-        <h2 className="mt-2 font-display text-3xl font-semibold leading-tight">
-          Get new apartments <span className="font-normal italic text-accent">in your inbox</span>
+      <div className="sheet p-8">
+        <p className="text-xs uppercase tracking-[0.32em] text-brass">Optional</p>
+        <h2 className="mt-2 font-display text-4xl leading-tight font-medium">
+          Get new apartments <span className="italic text-brass">in your inbox</span>
         </h2>
         <p className="mt-2 mb-6 text-sm text-ink-soft">
           Browsing never needs an account. Sign in to get a daily or weekly email

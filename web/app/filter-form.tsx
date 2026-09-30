@@ -46,7 +46,7 @@ export function ProgressBar() {
   return (
     <span
       aria-hidden
-      className="pointer-events-none fixed inset-x-0 top-0 z-50 h-1 origin-left animate-[progress_1.6s_var(--ease-out-soft)_infinite] bg-accent"
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5 origin-left animate-[progress_1.6s_var(--ease-out-soft)_infinite] bg-metal"
     />
   );
 }

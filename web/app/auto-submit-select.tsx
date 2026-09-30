@@ -64,7 +64,7 @@ export function AutoSubmitSelect({
                 }}
                 className={`${OPTION_ROW} ${selected ? "font-medium text-accent-dim" : ""}`}
               >
-                <span className={`size-1.5 shrink-0 rounded-full ${selected ? "bg-accent" : "bg-transparent"}`} />
+                <span className={`size-1.5 shrink-0 rotate-45 ${selected ? "bg-brass" : "bg-transparent"}`} />
                 <span className="break-words">{o.label}</span>
               </button>
             );

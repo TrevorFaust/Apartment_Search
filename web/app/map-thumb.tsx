@@ -59,11 +59,11 @@ export function MapThumb({
       >
         <path
           d="M12 0C5.4 0 0 5.2 0 11.7 0 20.4 12 32 12 32s12-11.6 12-20.3C24 5.2 18.6 0 12 0Z"
-          fill="var(--color-accent)"
+          fill="var(--color-brass)"
         />
         <circle cx="12" cy="11.5" r="4.5" fill="var(--color-bg-elevated)" />
       </svg>
-      <span className="absolute bottom-2.5 left-2.5 rounded-full bg-bg-elevated/90 px-2.5 py-0.5 text-[10px] text-ink-soft shadow-soft backdrop-blur">
+      <span className="absolute bottom-2.5 left-2.5 bg-bg-elevated/95 px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
         {label}
       </span>
       <span className="absolute bottom-0.5 right-2 text-[8px] text-ink/60">

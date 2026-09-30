@@ -186,29 +186,35 @@ export default async function ListingsPage({
 
   return (
     <div className="rise">
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1 rounded-full border border-line/70 bg-bg-elevated/70 p-1 shadow-soft">
-          {TABS.map((t) => (
-            <Link
-              key={t.id}
-              href={tabHref(t.id)}
-              aria-current={filters.tab === t.id ? "page" : undefined}
-              className={`press rounded-full px-4 py-1.5 text-sm ${
-                filters.tab === t.id
-                  ? "bg-ink text-bg-elevated shadow-soft hover:bg-accent-dim"
-                  : "text-ink-soft hover:bg-accent-wash hover:text-accent-dim"
-              }`}
-            >
-              <LinkPending>{t.label}</LinkPending>
-            </Link>
-          ))}
-        </div>
-        <div className="ml-auto flex flex-wrap items-center gap-4">
-          <span className="font-display text-sm italic text-ink-soft">
+      <div className="mb-8 flex flex-col gap-6 border-b border-ink/15 pb-6 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.32em] text-brass">Open listings</p>
+          <p className="mt-2 font-display text-5xl leading-none font-medium tracking-tight text-ink tabular-nums sm:text-6xl">
+            {totalCount.toLocaleString()}
+          </p>
+          <p className="mt-3 max-w-sm text-sm leading-relaxed text-ink-soft">
             {totalCount === 0
-              ? "0 listings"
-              : `Showing ${showingFrom}–${showingTo} of ${totalCount}`}
-          </span>
+              ? "Nothing matches. Widen a filter and keep looking."
+              : `Showing ${showingFrom}–${showingTo}, still on the market.`}
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-3 md:items-end">
+          <div className="flex flex-wrap border border-ink/20 bg-bg-elevated">
+            {TABS.map((t) => (
+              <Link
+                key={t.id}
+                href={tabHref(t.id)}
+                aria-current={filters.tab === t.id ? "page" : undefined}
+                className={`press inline-flex min-h-11 items-center px-4 text-xs uppercase tracking-[0.14em] ${
+                  filters.tab === t.id
+                    ? "bg-ink text-bg-elevated"
+                    : "text-ink-soft hover:bg-accent-wash hover:text-ink"
+                }`}
+              >
+                <LinkPending>{t.label}</LinkPending>
+              </Link>
+            ))}
+          </div>
           <AutoSubmitSelect
             label="Sort"
             name="sort"
@@ -222,7 +228,7 @@ export default async function ListingsPage({
 
       <FilterForm
         id={FORM_ID}
-        className="mb-3 grid grid-cols-2 gap-3 rounded-3xl border border-line/70 bg-bg-elevated/60 p-5 shadow-soft sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+        className="sheet mb-4 grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
       >
         {filters.tab !== "all" && (
           <input type="hidden" name="tab" value={filters.tab} />
@@ -270,12 +276,12 @@ export default async function ListingsPage({
         />
         {/* Same label row + control height as the fields, so the buttons line up with them. */}
         <div className="flex flex-col gap-1 self-start">
-          <span aria-hidden className="min-h-4" />
-          <div className="flex h-[2.4375rem] items-center gap-2">
+          <span aria-hidden className="min-h-5" />
+          <div className="flex h-11 items-center gap-2">
             <button
               suppressHydrationWarning
               type="submit"
-              className="press flex h-full items-center rounded-full bg-ink px-5 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow group-aria-busy:cursor-progress group-aria-busy:opacity-60"
+              className="press flex h-full items-center bg-ink px-5 text-xs uppercase tracking-[0.16em] text-bg-elevated hover:bg-metal hover:text-ink group-aria-busy:cursor-progress group-aria-busy:opacity-60"
             >
               <span className="group-aria-busy:hidden">Filter</span>
               <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
@@ -283,7 +289,7 @@ export default async function ListingsPage({
             {hasActiveFilters(filters) && (
               <Link
                 href={clearAllHref}
-                className="press flex h-full items-center rounded-full border border-line px-4 text-sm text-ink-soft hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+                className="press flex h-full items-center border border-ink/20 px-4 text-xs uppercase tracking-[0.14em] text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
               >
                 <LinkPending>Clear all</LinkPending>
               </Link>
@@ -292,28 +298,28 @@ export default async function ListingsPage({
         </div>
       </FilterForm>
 
-      <p className="mb-8 pl-2 text-[11px] text-ink-faint">
+      <p className="mb-8 text-xs leading-relaxed tracking-wide text-ink-faint">
         {`Only listings posted in the last ${MAX_LISTING_AGE_DAYS} days that are still online. `}
         Each one is re-checked daily and dropped once it&apos;s taken down.
       </p>
 
       {radiusActive && !hasRadius && (
-        <p className="mb-4 rounded-2xl border border-dashed border-ink/25 p-4 text-xs text-ink-soft">
+        <p className="mb-4 border border-dashed border-brass/60 bg-bg-elevated p-4 text-sm text-ink-soft">
           Radius needs at least one city selected that has a geocoded downtown
           center (currently the cities the scraper searches).
         </p>
       )}
 
       {hasRadius && listings.length === 0 && totalCount === 0 && (
-        <p className="mb-4 rounded-2xl border border-dashed border-ink/25 p-4 text-xs text-ink-soft">
+        <p className="mb-4 border border-dashed border-brass/60 bg-bg-elevated p-4 text-sm text-ink-soft">
           No listings within {filters.radiusMiles} mi. Listings may lack
           coordinates yet — run <code>npm run scrape</code> to geocode them.
         </p>
       )}
 
       {totalCount === 0 ? (
-        <div className="rounded-3xl border border-dashed border-ink/25 bg-bg-elevated/40 p-16 text-center">
-          <p className="font-display text-2xl italic text-ink-soft">
+        <div className="sheet px-8 py-20 text-center">
+          <p className="font-display text-4xl italic text-ink">
             Nothing here yet.
           </p>
           <p className="mt-2 text-sm text-ink-faint">
@@ -323,7 +329,7 @@ export default async function ListingsPage({
         </div>
       ) : (
         <>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-px bg-ink/20 sm:grid-cols-2 lg:grid-cols-3">
             {listings.map((l, i) => (
               <ListingCard
                 key={l.id}
@@ -351,7 +357,7 @@ export default async function ListingsPage({
 
 function LoadError({ message }: { message: string }) {
   return (
-    <p className="rounded-2xl border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
+    <p className="border border-ink/20 bg-bg-deep p-4 text-sm text-ink">
       Couldn&apos;t load listings: {message}
     </p>
   );

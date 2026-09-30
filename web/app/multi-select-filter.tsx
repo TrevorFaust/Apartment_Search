@@ -107,7 +107,7 @@ export function MultiSelectFilter({
                   className={`${OPTION_ROW} ${on ? "font-medium text-accent-dim" : ""}`}
                 >
                   <span
-                    className={`flex size-4 shrink-0 items-center justify-center rounded-md border text-[10px] transition-colors ${
+                    className={`flex size-4 shrink-0 items-center justify-center border text-[10px] transition-colors ${
                       on
                         ? "border-accent bg-accent text-bg-elevated"
                         : "border-ink/25 bg-bg-elevated"

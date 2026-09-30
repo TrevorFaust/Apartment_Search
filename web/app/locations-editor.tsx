@@ -121,7 +121,7 @@ export function LocationsEditor({
               className="field-control normal-case tracking-normal"
             />
             {activeRow === index && suggestions.length > 0 && (
-              <ul className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-48 overflow-y-auto rounded-2xl border border-line/80 bg-bg-elevated p-1.5 normal-case tracking-normal shadow-lift">
+              <ul className="absolute top-full right-0 left-0 z-30 mt-1.5 max-h-48 overflow-y-auto border border-ink/20 bg-bg-elevated p-1.5 normal-case tracking-normal shadow-lift">
                 {suggestions.map((s) => (
                   <li key={`${s.city}-${s.state}`}>
                     <button
@@ -129,7 +129,7 @@ export function LocationsEditor({
                       suppressHydrationWarning
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => pickSuggestion(index, s)}
-                      className="block w-full rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-accent-dim"
+                      className="block min-h-11 w-full px-3 py-2 text-left text-sm transition-colors hover:bg-accent-wash hover:text-ink"
                     >
                       {formatCityOption(s)}
                     </button>
@@ -160,7 +160,7 @@ export function LocationsEditor({
               type="button"
               suppressHydrationWarning
               onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
-              className="press rounded-full border border-ink/15 px-3 py-2 text-xs text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
+              className="press inline-flex min-h-11 items-center border border-ink/20 px-3 text-xs uppercase tracking-[0.12em] text-ink-soft hover:border-ink hover:bg-ink hover:text-metal"
             >
               Remove
             </button>
@@ -171,7 +171,7 @@ export function LocationsEditor({
         type="button"
         suppressHydrationWarning
         onClick={() => setRows((prev) => [...prev, { city: "", state: "" }])}
-        className="press rounded-full border border-dashed border-ink/25 px-4 py-1.5 text-xs text-ink-soft hover:border-solid hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+        className="press inline-flex min-h-11 items-center border border-dashed border-ink/25 px-4 text-xs uppercase tracking-[0.12em] text-ink-soft hover:border-solid hover:border-brass hover:bg-accent-wash hover:text-brass"
       >
         + Add location
       </button>

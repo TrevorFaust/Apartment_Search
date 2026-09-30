@@ -20,7 +20,7 @@ export function AuthForm() {
     <form action={action} className="space-y-4">
       <input type="hidden" name="mode" value={activeMode} />
 
-      <div className="grid grid-cols-2 gap-1 rounded-full border border-line/70 bg-bg p-1">
+      <div className="grid grid-cols-2 border border-ink/20 bg-bg">
         {(["signup", "signin"] as const).map((m) => (
           <button
             key={m}
@@ -28,10 +28,10 @@ export function AuthForm() {
             suppressHydrationWarning
             onClick={() => setMode(m)}
             aria-pressed={activeMode === m}
-            className={`press rounded-full py-2 text-sm ${
+            className={`press min-h-11 py-2 text-xs uppercase tracking-[0.14em] ${
               activeMode === m
-                ? "bg-ink text-bg-elevated shadow-soft"
-                : "text-ink-soft hover:bg-accent-wash hover:text-accent-dim"
+                ? "bg-ink text-metal"
+                : "text-ink-soft hover:bg-accent-wash hover:text-ink"
             }`}
           >
             {m === "signup" ? "Create account" : "Sign in"}
@@ -70,7 +70,7 @@ export function AuthForm() {
       </label>
 
       {state.error && (
-        <p role="alert" className="rounded-2xl bg-accent-wash px-4 py-2.5 text-sm text-accent-dim">
+        <p role="alert" className="border border-brass/50 bg-accent-wash px-4 py-2.5 text-sm text-brass">
           {state.error}
         </p>
       )}
@@ -79,7 +79,7 @@ export function AuthForm() {
         suppressHydrationWarning
         type="submit"
         disabled={pending}
-        className="press w-full rounded-full bg-accent py-3 text-sm font-medium text-bg-elevated shadow-glow hover:bg-accent-dim disabled:opacity-60"
+        className="press w-full min-h-11 bg-ink py-3 text-xs uppercase tracking-[0.18em] text-metal hover:bg-metal hover:text-ink disabled:opacity-60"
       >
         {pending ? "One sec…" : isSignup ? "Create account" : "Sign in"}
       </button>
