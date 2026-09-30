@@ -4,7 +4,7 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import type * as Leaflet from "leaflet";
-import { encodeArea, parseArea, type Coordinates } from "@/lib/geo";
+import { encodeAreas, parseAreas, type Coordinates } from "@/lib/geo";
 import { FieldLabel, submitClosestForm } from "./dropdown";
 
 /**
@@ -34,6 +34,13 @@ export function AreaFilter({
     submitClosestForm(anchorRef.current);
   };
 
+  const rings = parseAreas(area);
+  const summary = !rings
+    ? "Draw on map"
+    : rings.length === 1
+      ? "1 drawn area"
+      : `${rings.length} drawn areas`;
+
   return (
     <div className="flex flex-col gap-1">
       <input ref={anchorRef} type="hidden" name="area" value={area} />
@@ -44,16 +51,16 @@ export function AreaFilter({
         onClick={() => setOpen(true)}
         className="field-control flex items-center justify-between gap-2 text-left hover:border-accent"
       >
-        <span className="truncate">{area ? "Drawn area" : "Draw on map"}</span>
+        <span className="truncate">{summary}</span>
         <PencilIcon />
       </button>
       {open &&
         createPortal(
           <AreaDrawer
-            initial={parseArea(area)}
+            initial={rings}
             centers={centers}
             onCancel={() => setOpen(false)}
-            onApply={(points) => apply(points ? encodeArea(points) : "")}
+            onApply={(next) => apply(next?.length ? encodeAreas(next) : "")}
           />,
           document.body,
         )}
@@ -61,28 +68,30 @@ export function AreaFilter({
   );
 }
 
+type MapTool = "draw" | "pan" | "erase";
+
 function AreaDrawer({
   initial,
   centers,
   onCancel,
   onApply,
 }: {
-  initial: Coordinates[] | null;
+  initial: Coordinates[][] | null;
   centers: Coordinates[];
   onCancel: () => void;
-  onApply: (points: Coordinates[] | null) => void;
+  onApply: (rings: Coordinates[][] | null) => void;
 }) {
   const mapEl = useRef<HTMLDivElement>(null);
-  const [points, setPoints] = useState<Coordinates[] | null>(initial);
-  const [drawing, setDrawing] = useState(initial == null);
-  const drawingRef = useRef(drawing);
-  const setDrawMode = useRef<(on: boolean) => void>(() => {});
-  const clearShape = useRef<() => void>(() => {});
+  const [shapes, setShapes] = useState<Coordinates[][]>(initial ?? []);
+  const [tool, setTool] = useState<MapTool>(initial?.length ? "pan" : "draw");
+  const toolRef = useRef(tool);
+  const setToolMode = useRef<(next: MapTool) => void>(() => {});
+  const clearShapes = useRef<() => void>(() => {});
 
   useEffect(() => {
-    drawingRef.current = drawing;
-    setDrawMode.current(drawing);
-  }, [drawing]);
+    toolRef.current = tool;
+    setToolMode.current(tool);
+  }, [tool]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -112,11 +121,37 @@ function AreaDrawer({
       }).addTo(map);
 
       const style = { color: "#8a6a2f", weight: 2, fillColor: "#c9a35a", fillOpacity: 0.18 };
-      let shape: Leaflet.Polygon | Leaflet.Polyline | null = null;
+      const eraseStyle = { color: "#6e2e24", weight: 3, fillColor: "#c9a35a", fillOpacity: 0.28 };
+      const saved: Array<{ coords: Coordinates[]; layer: Leaflet.Polygon }> = [];
+      let draft: Leaflet.Polyline | null = null;
 
-      if (initial) {
-        shape = L.polygon(initial.map((p) => [p.lat, p.lng] as [number, number]), style).addTo(map);
-        map.fitBounds(shape.getBounds(), { padding: [40, 40] });
+      const publish = () => setShapes(saved.map((item) => item.coords));
+
+      const restyle = (next: MapTool) => {
+        for (const item of saved) item.layer.setStyle(next === "erase" ? eraseStyle : style);
+      };
+
+      const addShape = (coords: Coordinates[]) => {
+        const layer = L.polygon(
+          coords.map((p) => [p.lat, p.lng] as [number, number]),
+          style,
+        ).addTo(map!);
+        const item = { coords, layer };
+        saved.push(item);
+        layer.on("click", (event) => {
+          if (toolRef.current !== "erase") return;
+          L.DomEvent.stopPropagation(event);
+          layer.remove();
+          const index = saved.indexOf(item);
+          if (index >= 0) saved.splice(index, 1);
+          publish();
+        });
+      };
+
+      if (initial?.length) {
+        for (const ring of initial) addShape(ring);
+        const group = L.featureGroup(saved.map((item) => item.layer));
+        map.fitBounds(group.getBounds(), { padding: [40, 40] });
       } else if (centers.length === 1) {
         map.setView([centers[0]!.lat, centers[0]!.lng], 13);
       } else if (centers.length > 1) {
@@ -125,25 +160,29 @@ function AreaDrawer({
         map.setView([39.5, -98.35], 4);
       }
 
-      clearShape.current = () => {
-        shape?.remove();
-        shape = null;
+      clearShapes.current = () => {
+        draft?.remove();
+        draft = null;
+        for (const item of saved) item.layer.remove();
+        saved.length = 0;
+        publish();
       };
 
       const container = map.getContainer();
-      setDrawMode.current = (on) => {
+      setToolMode.current = (next) => {
         if (!map) return;
-        if (on) {
+        restyle(next);
+        if (next === "draw") {
           map.dragging.disable();
           container.style.cursor = "crosshair";
           container.style.touchAction = "none";
         } else {
           map.dragging.enable();
-          container.style.cursor = "";
+          container.style.cursor = next === "erase" ? "pointer" : "grab";
           container.style.touchAction = "";
         }
       };
-      setDrawMode.current(drawingRef.current);
+      setToolMode.current(toolRef.current);
 
       let trace: Coordinates[] = [];
       let tracing = false;
@@ -154,34 +193,35 @@ function AreaDrawer({
       };
 
       container.addEventListener("pointerdown", (e) => {
-        if (!drawingRef.current || e.button !== 0) return;
+        if (toolRef.current !== "draw" || e.button !== 0) return;
+        if ((e.target as HTMLElement).closest?.(".leaflet-control")) return;
         e.preventDefault();
-        container.setPointerCapture(e.pointerId);
+        try {
+          container.setPointerCapture(e.pointerId);
+        } catch {
+          /* A cancelled pointer doesn't need capture for the trace to finish. */
+        }
         tracing = true;
         trace = [toLatLng(e)];
-        shape?.remove();
-        shape = L.polyline([[trace[0]!.lat, trace[0]!.lng]], style).addTo(map!);
+        draft?.remove();
+        draft = L.polyline([[trace[0]!.lat, trace[0]!.lng]], style).addTo(map!);
       });
 
       container.addEventListener("pointermove", (e) => {
-        if (!tracing || !shape) return;
+        if (!tracing || !draft) return;
         const point = toLatLng(e);
         trace.push(point);
-        (shape as Leaflet.Polyline).addLatLng([point.lat, point.lng]);
+        draft.addLatLng([point.lat, point.lng]);
       });
 
       const finish = () => {
         if (!tracing) return;
         tracing = false;
-        shape?.remove();
-        shape = null;
-        if (trace.length < 3) {
-          setPoints(null);
-          return;
-        }
-        shape = L.polygon(trace.map((p) => [p.lat, p.lng] as [number, number]), style).addTo(map!);
-        setPoints(trace);
-        setDrawing(false);
+        draft?.remove();
+        draft = null;
+        if (trace.length < 3) return;
+        addShape(trace);
+        publish();
       };
       container.addEventListener("pointerup", finish);
       container.addEventListener("pointercancel", finish);
@@ -210,32 +250,45 @@ function AreaDrawer({
           <div>
             <p className="text-xs uppercase tracking-[0.18em] text-brass">Map area</p>
             <p className="text-sm text-ink-soft">
-              {drawing
-                ? "Press and drag to outline the area you want."
-                : points
-                  ? "Only listings with a pin inside this outline will show."
-                  : "Draw an outline, or cancel to keep the current filters."}
+              {tool === "draw"
+                ? "Press and drag to add an area. Draw again for another."
+                : tool === "erase"
+                  ? "Click an outline to remove it."
+                  : "Drag to move the map. Scroll, or use the + control, to zoom."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => {
-                clearShape.current();
-                setPoints(null);
-                setDrawing(true);
-              }}
-              className="press min-h-10 border border-ink/20 px-3 text-xs uppercase tracking-[0.14em] text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
+              aria-pressed={tool === "draw"}
+              onClick={() => setTool("draw")}
+              className={toolClass(tool === "draw")}
             >
-              {points ? "Redraw" : drawing ? "Drawing…" : "Draw"}
+              Draw
             </button>
-            {drawing && (
+            <button
+              type="button"
+              aria-pressed={tool === "pan"}
+              onClick={() => setTool("pan")}
+              className={toolClass(tool === "pan")}
+            >
+              Move
+            </button>
+            <button
+              type="button"
+              aria-pressed={tool === "erase"}
+              onClick={() => setTool("erase")}
+              className={toolClass(tool === "erase")}
+            >
+              Erase
+            </button>
+            {shapes.length > 0 && (
               <button
                 type="button"
-                onClick={() => setDrawing(false)}
+                onClick={() => clearShapes.current()}
                 className="press min-h-10 border border-ink/20 px-3 text-xs uppercase tracking-[0.14em] text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
               >
-                Pan map
+                Clear
               </button>
             )}
             <button
@@ -247,11 +300,11 @@ function AreaDrawer({
             </button>
             <button
               type="button"
-              disabled={!points && !initial}
-              onClick={() => onApply(points)}
+              disabled={shapes.length === 0 && (initial?.length ?? 0) === 0}
+              onClick={() => onApply(shapes.length ? shapes : null)}
               className="press min-h-10 bg-ink px-4 text-xs uppercase tracking-[0.16em] text-bg-elevated hover:bg-metal hover:text-ink disabled:opacity-40"
             >
-              {points ? "Apply area" : "Remove area"}
+              {shapes.length ? `Apply ${shapes.length === 1 ? "area" : "areas"}` : "Remove areas"}
             </button>
           </div>
         </div>
@@ -259,6 +312,14 @@ function AreaDrawer({
       </div>
     </div>
   );
+}
+
+function toolClass(active: boolean) {
+  return `press min-h-10 border px-3 text-xs uppercase tracking-[0.14em] ${
+    active
+      ? "border-ink bg-ink text-bg-elevated"
+      : "border-ink/20 text-ink-soft hover:border-ink hover:bg-ink hover:text-bg-elevated"
+  }`;
 }
 
 function PencilIcon() {

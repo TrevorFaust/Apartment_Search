@@ -8,7 +8,7 @@ import { LinkPending } from "./link-pending";
 import { PageStrip } from "./page-strip";
 import { FilterInput } from "./filter-input";
 import { SOURCE_OPTIONS, titleCase } from "@/lib/sources";
-import { parseArea } from "@/lib/geo";
+import { parseAreas } from "@/lib/geo";
 import { AreaFilter } from "./area-filter";
 import { getViewer } from "@/lib/auth";
 import { resolveMapPoints } from "@/lib/area-maps";
@@ -116,7 +116,7 @@ export default async function ListingsPage({
   const hasRadius =
     radiusActive &&
     searchLocations.some((l) => l.center_lat != null && l.center_lng != null);
-  const drawnArea = parseArea(filters.area);
+  const drawnArea = parseAreas(filters.area);
   const geoScope: GeoScope = {
     radius: hasRadius ? { miles: filters.radiusMiles, locations: searchLocations } : undefined,
     area: drawnArea ?? undefined,

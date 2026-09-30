@@ -16,8 +16,9 @@ export function haversineMiles(a: Coordinates, b: Coordinates): number {
 }
 
 const MAX_AREA_POINTS = 60;
+const MAX_AREAS = 8;
 
-/** Parses a drawn area (`lat,lng;lat,lng;…`); needs at least three corners. */
+/** One outline: `lat,lng;lat,lng;…`, at least three corners. */
 export function parseArea(value: string | null | undefined): Coordinates[] | null {
   if (!value) return null;
   const points: Coordinates[] = [];
@@ -30,6 +31,20 @@ export function parseArea(value: string | null | undefined): Coordinates[] | nul
   return points.length >= 3 && points.length <= MAX_AREA_POINTS * 2 ? points : null;
 }
 
+/** Several outlines joined by `|`, so a search can keep the north and the south. */
+export function parseAreas(value: string | null | undefined): Coordinates[][] | null {
+  if (!value) return null;
+  const chunks = value.split("|").filter(Boolean);
+  if (chunks.length === 0 || chunks.length > MAX_AREAS) return null;
+  const rings: Coordinates[][] = [];
+  for (const chunk of chunks) {
+    const ring = parseArea(chunk);
+    if (!ring) return null;
+    rings.push(ring);
+  }
+  return rings;
+}
+
 /** Thins a freehand trace to a URL-sized outline. */
 export function encodeArea(points: Coordinates[]): string {
   const step = Math.max(1, Math.ceil(points.length / MAX_AREA_POINTS));
@@ -39,13 +54,27 @@ export function encodeArea(points: Coordinates[]): string {
     .join(";");
 }
 
-export function polygonBounds(points: Coordinates[]) {
-  return {
-    minLat: Math.min(...points.map((p) => p.lat)),
-    maxLat: Math.max(...points.map((p) => p.lat)),
-    minLng: Math.min(...points.map((p) => p.lng)),
-    maxLng: Math.max(...points.map((p) => p.lng)),
-  };
+export function encodeAreas(rings: Coordinates[][]): string {
+  return rings
+    .slice(0, MAX_AREAS)
+    .map((ring) => encodeArea(ring))
+    .join("|");
+}
+
+export function polygonBounds(rings: Coordinates[][]) {
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  for (const ring of rings) {
+    for (const point of ring) {
+      if (point.lat < minLat) minLat = point.lat;
+      if (point.lat > maxLat) maxLat = point.lat;
+      if (point.lng < minLng) minLng = point.lng;
+      if (point.lng > maxLng) maxLng = point.lng;
+    }
+  }
+  return { minLat, maxLat, minLng, maxLng };
 }
 
 /** Ray casting; fine at city scale where lat/lng is close to flat. */
@@ -60,6 +89,10 @@ export function pointInPolygon(point: Coordinates, polygon: Coordinates[]): bool
     if (crosses) inside = !inside;
   }
   return inside;
+}
+
+export function pointInAnyArea(point: Coordinates, rings: Coordinates[][]): boolean {
+  return rings.some((ring) => pointInPolygon(point, ring));
 }
 
 export function withinRadiusMiles(

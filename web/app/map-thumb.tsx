@@ -1,4 +1,15 @@
+import type { MouseEvent } from "react";
+
 const TILE = 256;
+export const MAP_ZOOM_MIN = 10;
+export const MAP_ZOOM_MAX = 17;
+
+/** Whole pixels, with the sign written the way the browser serializes calc(). */
+function tilePosition(px: number): string {
+  const n = Math.round(px);
+  if (n === 0) return "50%";
+  return n < 0 ? `calc(50% - ${-n}px)` : `calc(50% + ${n}px)`;
+}
 
 /**
  * Street map centered on a listing, stitched from a 3x3 block of map tiles
@@ -50,7 +61,7 @@ export function MapThumb({
           loading="lazy"
           draggable={false}
           className="absolute max-w-none saturate-[0.55] sepia-[0.12] transition-transform duration-500 ease-out-soft"
-          style={{ left: `calc(50% + ${t.left}px)`, top: `calc(50% + ${t.top}px)` }}
+          style={{ left: tilePosition(t.left), top: tilePosition(t.top) }}
         />
       ))}
       <svg
@@ -70,6 +81,45 @@ export function MapThumb({
       <span className="absolute bottom-0.5 right-2 text-[8px] text-ink/60">
         © OpenStreetMap contributors
       </span>
+    </div>
+  );
+}
+
+export function MapZoom({
+  zoom,
+  onChange,
+}: {
+  zoom: number;
+  onChange: (zoom: number) => void;
+}) {
+  const step = (event: MouseEvent<HTMLButtonElement>, next: number) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onChange(Math.min(MAP_ZOOM_MAX, Math.max(MAP_ZOOM_MIN, next)));
+  };
+
+  return (
+    <div className="absolute top-2 right-2 z-20 flex flex-col border border-ink/20 bg-bg-elevated/95">
+      <button
+        type="button"
+        aria-label="Zoom in"
+        disabled={zoom >= MAP_ZOOM_MAX}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => step(event, zoom + 1)}
+        className="press flex size-9 items-center justify-center text-lg leading-none text-ink hover:bg-ink hover:text-metal disabled:opacity-30"
+      >
+        +
+      </button>
+      <button
+        type="button"
+        aria-label="Zoom out"
+        disabled={zoom <= MAP_ZOOM_MIN}
+        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => step(event, zoom - 1)}
+        className="press flex size-9 items-center justify-center border-t border-ink/15 text-lg leading-none text-ink hover:bg-ink hover:text-metal disabled:opacity-30"
+      >
+        −
+      </button>
     </div>
   );
 }

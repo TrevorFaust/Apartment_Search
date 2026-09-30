@@ -7,7 +7,7 @@ import { sourceLabel as labelForSource } from "@/lib/sources";
 import type { MapPoint } from "@/lib/area-maps";
 import type { Pursuit } from "@/lib/marks";
 import { toggleFavorite, toggleHidden, updatePursuit } from "./actions";
-import { MapThumb } from "./map-thumb";
+import { MapThumb, MapZoom } from "./map-thumb";
 import { ListingPreview } from "./listing-preview";
 
 export function ListingCard({
@@ -31,6 +31,7 @@ export function ListingCard({
   const [draft, setDraft] = useState<Pursuit | null>(pursuit);
   const [imageFailed, setImageFailed] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [mapZoom, setMapZoom] = useState(mapPoint?.approximate ? 13 : 15);
   // Plain click previews; ctrl/cmd/shift/middle click still opens the source in a new tab.
   const openPreview = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
@@ -63,6 +64,7 @@ export function ListingCard({
       style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
     >
       <Corners />
+      <div className="relative">
       <a
         href={listing.url}
         target="_blank"
@@ -92,7 +94,7 @@ export function ListingCard({
             <MapThumb
               lat={mapPoint.lat}
               lng={mapPoint.lng}
-              zoom={mapPoint.approximate ? 13 : 15}
+              zoom={mapZoom}
               label={mapPoint.label}
             />
           ) : (
@@ -115,6 +117,10 @@ export function ListingCard({
           )}
         </div>
       </a>
+      {(!listing.image_url?.startsWith("http") || imageFailed) && mapPoint && (
+        <MapZoom zoom={mapZoom} onChange={setMapZoom} />
+      )}
+      </div>
 
       <div className="flex flex-1 flex-col gap-2 px-4 pt-4 pb-4">
         <div className="flex items-end justify-between gap-3 border-b border-metal/70 pb-2">

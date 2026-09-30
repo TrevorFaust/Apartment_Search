@@ -1,8 +1,8 @@
 import type { ListingRow, SearchLocation } from "./supabase";
 import { parseAmount } from "./amounts";
 import {
-  parseArea,
-  pointInPolygon,
+  parseAreas,
+  pointInAnyArea,
   polygonBounds,
   withinRadiusMiles,
   type Coordinates,
@@ -88,7 +88,7 @@ export function parseFilters(
     cities: parseListParam(params, "city"),
     source: str("source"),
     radiusMiles: amount("radius_miles"),
-    area: parseArea(str("area")) ? str("area") : "",
+    area: parseAreas(str("area")) ? str("area") : "",
     postedWithin: POSTED_WITHIN_OPTIONS.some((o) => o.value === str("posted_within"))
       ? str("posted_within")
       : "",
@@ -285,7 +285,7 @@ type QueryFactory = () => QueryLike;
  */
 export type GeoScope = {
   radius?: { miles: string; locations: SearchLocation[] };
-  area?: Coordinates[];
+  area?: Coordinates[][];
 };
 
 export function hasGeoScope(scope: GeoScope): boolean {
@@ -321,7 +321,7 @@ export function filterByGeoScope<T extends Pick<ListingRow, "latitude" | "longit
       (row) =>
         row.latitude != null &&
         row.longitude != null &&
-        pointInPolygon({ lat: row.latitude, lng: row.longitude }, area),
+        pointInAnyArea({ lat: row.latitude, lng: row.longitude }, area),
     );
   }
   return out;

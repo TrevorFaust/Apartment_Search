@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ListingRow } from "@/lib/supabase";
 import type { MapPoint } from "@/lib/area-maps";
 import { formatFull } from "@/lib/dates";
-import { MapThumb } from "./map-thumb";
+import { MapThumb, MapZoom } from "./map-thumb";
 
 /**
  * Side panel with a listing's details. Most rental sites refuse to load
@@ -29,6 +29,7 @@ export function ListingPreview({
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [mapZoom, setMapZoom] = useState(mapPoint?.approximate ? 13 : 15);
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -154,13 +155,14 @@ export function ListingPreview({
               <p className="mb-2 text-xs uppercase tracking-[0.18em] text-brass">
                 {mapPoint.approximate ? "General area" : "Location"}
               </p>
-              <div className="h-56 border border-ink/15">
+              <div className="relative h-56 border border-ink/15">
                 <MapThumb
                   lat={mapPoint.lat}
                   lng={mapPoint.lng}
-                  zoom={mapPoint.approximate ? 13 : 15}
+                  zoom={mapZoom}
                   label={mapPoint.label}
                 />
+                <MapZoom zoom={mapZoom} onChange={setMapZoom} />
               </div>
             </div>
           )}
