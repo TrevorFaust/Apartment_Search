@@ -271,23 +271,27 @@ export default async function ListingsPage({
           options={SOURCE_OPTIONS}
           clearable
         />
-        <div className="flex items-end gap-2">
-          <button
-            suppressHydrationWarning
-            type="submit"
-            className="press rounded-full bg-ink px-5 py-2 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow group-aria-busy:cursor-progress group-aria-busy:opacity-60"
-          >
-            <span className="group-aria-busy:hidden">Filter</span>
-            <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
-          </button>
-          {hasActiveFilters(filters) && (
-            <Link
-              href={clearAllHref}
-              className="press rounded-full border border-line px-4 py-2 text-sm text-ink-soft hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+        {/* Same label row + control height as the fields, so the buttons line up with them. */}
+        <div className="flex flex-col gap-1 self-start">
+          <span aria-hidden className="min-h-4" />
+          <div className="flex h-[2.4375rem] items-center gap-2">
+            <button
+              suppressHydrationWarning
+              type="submit"
+              className="press flex h-full items-center rounded-full bg-ink px-5 text-sm text-bg-elevated shadow-soft hover:bg-accent hover:shadow-glow group-aria-busy:cursor-progress group-aria-busy:opacity-60"
             >
-              <LinkPending>Clear all</LinkPending>
-            </Link>
-          )}
+              <span className="group-aria-busy:hidden">Filter</span>
+              <span className="hidden animate-pulse group-aria-busy:inline">Filtering…</span>
+            </button>
+            {hasActiveFilters(filters) && (
+              <Link
+                href={clearAllHref}
+                className="press flex h-full items-center rounded-full border border-line px-4 text-sm text-ink-soft hover:border-accent hover:bg-accent-wash hover:text-accent-dim"
+              >
+                <LinkPending>Clear all</LinkPending>
+              </Link>
+            )}
+          </div>
         </div>
       </FilterForm>
 

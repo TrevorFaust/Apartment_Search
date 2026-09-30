@@ -111,10 +111,14 @@ peers are dropped. After each scrape, `flag_price_outliers()` groups active
 listings from the last 60 days by city and bedroom count (studio, 1, 2, 3, 4+),
 computes the mean and standard deviation (ignoring prices under 40% of the
 group median so the scams don't drag the average down), and flags anything
-below **mean − 2.5 × SD** (groups need at least 8 listings). Groups without
-enough data, or listings with no bedroom count, use 80% of the city's lowest
-cutoff, and nothing under $400 ever passes. Flagged listings are hidden on the
-site and left out of emails. Current cutoffs live in the `price_cutoffs` table:
+below **mean − 2.5 × SD** (groups need at least 8 listings). Two adjustments:
+a cutoff is never stricter than 40% below the group's average (markets with
+tightly clustered rents, like Seattle, would otherwise catch real deals), and a
+cutoff never drops as bedrooms go up (thin 4+ data could put it under the 3BR
+line). Groups without enough data, or listings with no bedroom count, use 80%
+of the city's lowest cutoff, and nothing under $400 ever passes. Flagged
+listings are hidden on the site and left out of emails. Current cutoffs live in
+the `price_cutoffs` table:
 
 | City | Beds | Mean | SD | Cutoff |
 | --- | --- | --- | --- | --- |
@@ -122,10 +126,10 @@ site and left out of emails. Current cutoffs live in the `price_cutoffs` table:
 | Chicago | 1 | $1,890 | $433 | $808 |
 | Chicago | 2 | $2,532 | $582 | $1,076 |
 | Chicago | 3 | $2,685 | $487 | $1,468 |
-| Chicago | 4+ | $2,735 | $593 | $1,254 |
-| Seattle | 1 | $2,124 | $238 | $1,529 |
-| Seattle | 2 | $2,409 | $313 | $1,626 |
-| Seattle | 3 | $2,491 | $292 | $1,761 |
+| Chicago | 4+ | $2,735 | $593 | $1,468 |
+| Seattle | 1 | $2,124 | $238 | $1,275 |
+| Seattle | 2 | $2,409 | $313 | $1,445 |
+| Seattle | 3 | $2,491 | $292 | $1,494 |
 
 (At 2 SD, real listings like a $1,000 Chicago 1BR got caught, so it's 2.5.)
 
