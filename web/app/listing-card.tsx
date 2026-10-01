@@ -32,6 +32,9 @@ export function ListingCard({
 }) {
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<Pursuit | null>(pursuit);
+  const [compose, setCompose] = useState<Pursuit | null>(null);
+  const composeRef = useRef(compose);
+  composeRef.current = compose;
   const [folding, setFolding] = useState(false);
   const [filed, setFiled] = useState(false);
   const articleRef = useRef<HTMLElement>(null);
@@ -44,9 +47,14 @@ export function ListingCard({
     e.preventDefault();
     setPreviewing(true);
   };
-  const fileListing = () => {
-    const next = draft ? null : { messagedAt: null, tourAt: null, tourWith: null };
-    if (next && fileAway && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  const ship = (next: Pursuit) => {
+    const packed: Pursuit = {
+      messagedAt: next.messagedAt,
+      tourAt: next.tourAt,
+      tourWith: next.tourWith?.trim() || null,
+      notes: next.notes?.trim() || null,
+    };
+    if (fileAway && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setFolding(true);
       window.setTimeout(() => {
         const rect = articleRef.current?.getBoundingClientRect();
@@ -64,14 +72,34 @@ export function ListingCard({
           );
         }
         setFiled(true);
-        setDraft(next);
-        startTransition(() => updatePursuit(listing.id, next));
+        setCompose(null);
+        setDraft(packed);
+        startTransition(() => updatePursuit(listing.id, packed));
       }, 460);
       return;
     }
-    setDraft(next);
-    startTransition(() => updatePursuit(listing.id, next));
+    setCompose(null);
+    setDraft(packed);
+    startTransition(() => updatePursuit(listing.id, packed));
   };
+  const onTrackClick = () => {
+    if (draft) {
+      setDraft(null);
+      setCompose(null);
+      startTransition(() => updatePursuit(listing.id, null));
+      return;
+    }
+    setCompose(compose ? null : { messagedAt: null, tourAt: null, tourWith: null, notes: null });
+  };
+  const onEdit = (next: Pursuit, commit: boolean) => {
+    if (compose) {
+      setCompose(next);
+      return;
+    }
+    setDraft(next);
+    if (commit) startTransition(() => updatePursuit(listing.id, next));
+  };
+  const form = compose ?? (fileAway ? null : draft);
   const isNew = now - new Date(listing.first_seen_at).getTime() < 24 * 60 * 60 * 1000;
   const isGone = !listing.is_active;
   const sourceLabel = labelForSource(listing.source);
@@ -206,17 +234,24 @@ export function ListingCard({
           Listed <span className="text-ink">{formatMonthDay(listedAt)}</span>
         </p>
 
-        <PursuitFields
-          listingId={listing.id}
-          pursuit={draft}
-          pending={pending}
-          onChange={(next) => {
-            setDraft(next);
-            startTransition(() => updatePursuit(listing.id, next));
-          }}
-        />
+        {form && (
+          <PursuitFields
+            listingId={listing.id}
+            pursuit={form}
+            pending={pending || folding}
+            onChange={onEdit}
+            onSend={
+              compose
+                ? () => {
+                    const current = composeRef.current;
+                    if (current) ship(current);
+                  }
+                : undefined
+            }
+          />
+        )}
 
-        {draft && (draft.messagedAt || draft.tourAt || draft.tourWith) && (
+        {draft && !compose && (draft.messagedAt || draft.tourAt || draft.tourWith) && (
           <p className="text-xs leading-relaxed text-brass">
             {[
               draft.messagedAt ? "Messaged" : null,
@@ -262,15 +297,15 @@ export function ListingCard({
           <button
             suppressHydrationWarning
             disabled={pending || folding}
-            aria-pressed={draft != null}
-            onClick={fileListing}
+            aria-pressed={draft != null || compose != null}
+            onClick={onTrackClick}
             className={`press inline-flex min-h-11 items-center border px-4 text-[11px] uppercase tracking-[0.16em] disabled:opacity-50 ${
-              draft
+              draft || compose
                 ? "border-ink bg-metal text-ink"
                 : "border-ink/20 text-ink-soft hover:border-ink hover:bg-ink hover:text-metal"
             }`}
           >
-            {draft ? "Tracking" : "Track"}
+            {draft ? "Tracking" : compose ? "Cancel" : "Track"}
           </button>
         </div>
       </div>
@@ -371,13 +406,14 @@ function PursuitFields({
   pursuit,
   pending,
   onChange,
+  onSend,
 }: {
   listingId: string;
-  pursuit: Pursuit | null;
+  pursuit: Pursuit;
   pending: boolean;
-  onChange: (next: Pursuit | null) => void;
+  onChange: (next: Pursuit, commit: boolean) => void;
+  onSend?: () => void;
 }) {
-  if (!pursuit) return null;
   const messaged = pursuit.messagedAt != null;
   return (
     <div className="mt-1 grid gap-2 border border-ink/15 bg-bg p-3">
@@ -387,10 +423,13 @@ function PursuitFields({
         disabled={pending}
         aria-pressed={messaged}
         onClick={() =>
-          onChange({
-            ...pursuit,
-            messagedAt: messaged ? null : new Date().toISOString(),
-          })
+          onChange(
+            {
+              ...pursuit,
+              messagedAt: messaged ? null : new Date().toISOString(),
+            },
+            true,
+          )
         }
         className={`press min-h-11 border px-3 text-left text-xs uppercase tracking-[0.14em] ${
           messaged
@@ -408,10 +447,13 @@ function PursuitFields({
           name={`tour-${listingId}`}
           value={toLocalInput(pursuit.tourAt)}
           onChange={(e) =>
-            onChange({
-              ...pursuit,
-              tourAt: fromLocalInput(e.target.value),
-            })
+            onChange(
+              {
+                ...pursuit,
+                tourAt: fromLocalInput(e.target.value),
+              },
+              true,
+            )
           }
           className="field-control normal-case tracking-normal"
         />
@@ -422,16 +464,39 @@ function PursuitFields({
           suppressHydrationWarning
           type="text"
           name={`with-${listingId}`}
-          defaultValue={pursuit.tourWith ?? ""}
+          value={pursuit.tourWith ?? ""}
+          maxLength={120}
           placeholder="Leasing office, a name"
-          onBlur={(e) => {
-            const tourWith = e.target.value.trim();
-            if (tourWith === (pursuit.tourWith ?? "")) return;
-            onChange({ ...pursuit, tourWith: tourWith || null });
-          }}
+          onChange={(e) => onChange({ ...pursuit, tourWith: e.target.value || null }, false)}
+          onBlur={(e) => onChange({ ...pursuit, tourWith: e.target.value.trim() || null }, true)}
           className="field-control normal-case tracking-normal"
         />
       </label>
+      <label className="flex flex-col gap-1 text-xs uppercase tracking-[0.14em] text-brass">
+        Notes
+        <textarea
+          suppressHydrationWarning
+          name={`notes-${listingId}`}
+          value={pursuit.notes ?? ""}
+          maxLength={400}
+          rows={3}
+          placeholder="Parking, pets, what they said back"
+          onChange={(e) => onChange({ ...pursuit, notes: e.target.value || null }, false)}
+          onBlur={(e) => onChange({ ...pursuit, notes: e.target.value.trim() || null }, true)}
+          className="field-control min-h-20 resize-y normal-case tracking-normal"
+        />
+      </label>
+      {onSend && (
+        <button
+          type="button"
+          suppressHydrationWarning
+          disabled={pending}
+          onClick={onSend}
+          className="press min-h-11 border border-ink bg-ink px-3 text-xs uppercase tracking-[0.14em] text-metal hover:bg-brass hover:text-bg-elevated disabled:opacity-50"
+        >
+          Send to Pursuing
+        </button>
+      )}
     </div>
   );
 }

@@ -22,7 +22,7 @@ const outfit = Outfit({
 
 export const metadata: Metadata = {
   title: "Lease Locator",
-  description: "Daily-scraped apartment listings, all in one place.",
+  description: "Your daily dose of apartments, all in one place.",
   applicationName: "Lease Locator",
 };
 
@@ -43,7 +43,7 @@ export default async function RootLayout({
           <div className="bg-ink text-bg-elevated">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-6 py-2.5">
               <p className="text-xs uppercase tracking-[0.32em] text-metal">
-                Scraped fresh, every morning
+                Your daily dose of apartments
               </p>
               <nav className="flex flex-wrap items-center gap-2 text-xs uppercase tracking-[0.16em]">
                 <Link href="/" className={NAV_LINK}>

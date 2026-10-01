@@ -6,7 +6,12 @@ export type Pursuit = {
   messagedAt: string | null;
   tourAt: string | null;
   tourWith: string | null;
+  notes: string | null;
 };
+
+const NOTE_MAX = 400;
+const WITH_MAX = 120;
+const COOKIE_BUDGET = 3600;
 
 export type Marks = {
   favorites: string[];
@@ -24,11 +29,23 @@ const UUID = /^[0-9a-f-]{36}$/i;
 
 const EMPTY: Marks = { favorites: [], hidden: [], pursuits: {} };
 
+function clip(value: unknown, max: number): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, max);
+}
+
 function cleanPursuit(value: unknown): Pursuit | null {
   if (!value || typeof value !== "object") return null;
-  const row = value as { m?: unknown; t?: unknown; w?: unknown };
+  const row = value as { m?: unknown; t?: unknown; w?: unknown; n?: unknown };
   const text = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
-  return { messagedAt: text(row.m), tourAt: text(row.t), tourWith: text(row.w) };
+  return {
+    messagedAt: text(row.m),
+    tourAt: text(row.t),
+    tourWith: clip(row.w, WITH_MAX),
+    notes: clip(row.n, NOTE_MAX),
+  };
 }
 
 async function readGuestMarks(): Promise<Marks> {
@@ -42,7 +59,7 @@ async function readGuestMarks(): Promise<Marks> {
     if (Array.isArray(parsed.p)) {
       for (const entry of parsed.p) {
         if (!Array.isArray(entry) || typeof entry[0] !== "string" || !UUID.test(entry[0])) continue;
-        const pursuit = cleanPursuit({ m: entry[1], t: entry[2], w: entry[3] });
+        const pursuit = cleanPursuit({ m: entry[1], t: entry[2], w: entry[3], n: entry[4] });
         if (pursuit) pursuits[entry[0]] = pursuit;
       }
     }
@@ -62,15 +79,20 @@ async function writeGuestMarks(marks: Marks): Promise<void> {
   if (pursuitEntries.length > GUEST_PURSUITS) {
     pursuitEntries = pursuitEntries.slice(pursuitEntries.length - GUEST_PURSUITS);
   }
-  (await cookies()).set(
-    GUEST_COOKIE,
-    JSON.stringify({
-      f: favoriteIds,
-      h: hiddenIds,
-      p: pursuitEntries.map(([id, p]) => [id, p.messagedAt, p.tourAt, p.tourWith]),
-    }),
-    { path: "/", httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" },
-  );
+  let payload = {
+    f: favoriteIds,
+    h: hiddenIds,
+    p: pursuitEntries.map(([id, p]) => [id, p.messagedAt, p.tourAt, p.tourWith, p.notes]),
+  };
+  while (JSON.stringify(payload).length > COOKIE_BUDGET && payload.p.length > 1) {
+    payload = { ...payload, p: payload.p.slice(1) };
+  }
+  (await cookies()).set(GUEST_COOKIE, JSON.stringify(payload), {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 export async function getMarks(viewer: Viewer | null): Promise<Marks> {
@@ -78,7 +100,7 @@ export async function getMarks(viewer: Viewer | null): Promise<Marks> {
 
   const { data, error } = await supabaseAdmin()
     .from("listing_marks")
-    .select("listing_id, favorite, hidden, pursuing, messaged_at, tour_at, tour_with")
+    .select("listing_id, favorite, hidden, pursuing, messaged_at, tour_at, tour_with, notes")
     .eq("user_id", viewer.id)
     .or("favorite.eq.true,hidden.eq.true,pursuing.eq.true")
     .limit(1000);
@@ -91,6 +113,7 @@ export async function getMarks(viewer: Viewer | null): Promise<Marks> {
       messagedAt: row.messaged_at,
       tourAt: row.tour_at,
       tourWith: row.tour_with,
+      notes: row.notes,
     };
   }
   return {
@@ -149,7 +172,8 @@ export async function setPursuit(
           pursuing: pursuit != null,
           messaged_at: pursuit?.messagedAt ?? null,
           tour_at: pursuit?.tourAt ?? null,
-          tour_with: pursuit?.tourWith?.trim() || null,
+          tour_with: clip(pursuit?.tourWith, WITH_MAX),
+          notes: clip(pursuit?.notes, NOTE_MAX),
           updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id,listing_id" },

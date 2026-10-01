@@ -71,11 +71,11 @@ export default async function PreferencesPage() {
   return (
     <div className="rise mx-auto max-w-2xl">
       <h2 className="font-display text-4xl font-medium">
-        Scraper <span className="italic text-brass">settings</span>
+        Search <span className="italic text-brass">settings</span>
       </h2>
       <p className="mt-1 mb-8 text-sm text-ink-soft">
-        These drive the scraper&apos;s search areas, radius filter, and the
-        owner&apos;s daily newsletter. For your own email alerts, use your Profile.
+        These set where the morning search looks, the radius, and your
+        newsletter. For your own email alerts, use your Profile.
       </p>
 
       <form
@@ -118,7 +118,7 @@ export default async function PreferencesPage() {
             emptyLabel="Any neighborhood"
           />
           <p className="mt-2 text-[10px] normal-case tracking-normal text-ink-faint">
-            Options come from scraped listings in your configured cities. Blank
+            Options come from listings already found in your cities. Blank
             selection = anywhere.
           </p>
         </Section>

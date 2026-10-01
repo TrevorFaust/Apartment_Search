@@ -176,8 +176,8 @@ export function LocationsEditor({
         + Add location
       </button>
       <p className="text-[10px] normal-case tracking-normal text-ink-faint">
-        Type a city name for suggestions (e.g. Chi → Chicago, IL). Saved as
-        lowercase for scraping. Each city is scraped separately. Craigslist and
+        Type a city name for suggestions (e.g. Chi → Chicago, IL). Each city is
+        searched on its own. Craigslist and
         Apartments.com run for every location; SeattleRentals (Seattle) and the
         Chicago sites (Chicago, IL) run only for matching cities.
       </p>

@@ -7,7 +7,7 @@ export default function Loading() {
       </div>
       <div className="sheet mb-8 h-36" />
       <p className="font-display text-3xl italic text-ink">Looking…</p>
-      <div className="mt-8 grid gap-px bg-ink/20 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-8 grid gap-px sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="h-96 animate-pulse bg-bg-elevated" />
         ))}

@@ -275,10 +275,12 @@ export default async function ListingsPage({
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-ink-soft">
             {totalCount > 0
               ? matchSummary(stats, filters.neighborhoods.length || availableNeighborhoods) ||
-                "Track a place once you message the owner or book a tour."
+                "Track a place, add a note if you want, then send it to Pursuing."
               : filters.tab === "pursuing"
-                ? "Track a place from the board once you message the owner or book a tour."
-                : "Nothing matches these filters. Widen them, or check back in the morning."}
+                ? "Track a place from the board, then send it here."
+                : filtersActive
+                  ? "No matches. Loosen a filter."
+                  : "A new batch of places shows up every morning."}
           </p>
         </div>
         <div className="mt-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -399,8 +401,8 @@ export default async function ListingsPage({
 
       {radiusActive && !hasRadius && (
         <p className="mb-4 border border-dashed border-brass/60 bg-bg-elevated p-4 text-sm text-ink-soft">
-          Radius needs at least one city selected that has a geocoded downtown
-          center (currently the cities the scraper searches).
+          Radius needs a city that already has a downtown pin. Pick one Lease
+          Locator checks each morning.
         </p>
       )}
 
@@ -417,14 +419,12 @@ export default async function ListingsPage({
             {filters.tab === "pursuing" ? "Nothing in pursuit." : "Nothing here yet."}
           </p>
           <p className="mt-2 text-sm text-ink-faint">
-            {filters.tab === "pursuing"
-              ? "Track a listing when you message the owner or book a tour. It stays on this tab."
-              : "Try widening the filters. New listings arrive with each morning\u2019s scrape."}
+            {emptyHint(filters.tab, filtersActive)}
           </p>
         </div>
       ) : (
         <>
-          <div className="grid gap-px bg-ink/20 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-px sm:grid-cols-2 lg:grid-cols-3">
             {listings.map((l, i) => (
               <ListingCard
                 key={l.id}
@@ -451,6 +451,18 @@ export default async function ListingsPage({
       )}
     </div>
   );
+}
+
+function emptyHint(tab: string, filtersActive: boolean): string {
+  if (tab === "pursuing") {
+    return "Hit Track on a listing, jot a tour or a note if you have one, then send it here.";
+  }
+  if (tab === "favorites") return "Save a place from the board and it keeps a seat here.";
+  if (tab === "hidden") return "Hide a listing when you are done looking at it.";
+  if (filtersActive) {
+    return "Picky, picky. Drop a filter and look again. New places show up every morning.";
+  }
+  return "A new batch of places shows up every morning.";
 }
 
 function LoadError({ message }: { message: string }) {
