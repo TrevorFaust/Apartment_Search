@@ -168,6 +168,10 @@ export function applyListingFilters(
     query = query.in("id", idList(hidden));
   } else {
     if (hidden.length > 0) query = query.not("id", "in", `(${hidden.join(",")})`);
+    // Tracked listings leave the board and live on the Pursuing tab.
+    if (tab !== "pursuing" && pursuing.length > 0) {
+      query = query.not("id", "in", `(${pursuing.join(",")})`);
+    }
     if (tab === "new") {
       query = query.gte("first_seen_at", daysAgoIso(1));
     }

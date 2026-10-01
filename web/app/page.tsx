@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin, type ListingRow, type SearchLocation } from "@/lib/supabase";
 import { ListingCard } from "./listing-card";
+import { PursuitFlights } from "./pursuit-flight";
 import { CityMultiSelect, NeighborhoodMultiSelect } from "./filter-multi-selects";
 import { AutoSubmitSelect } from "./auto-submit-select";
 import { FilterForm } from "./filter-form";
@@ -262,6 +263,7 @@ export default async function ListingsPage({
 
   return (
     <div className="rise">
+      <PursuitFlights />
       <div className="mb-8 border-b border-ink/15 pb-6">
         <div>
           <p className="text-xs uppercase tracking-[0.32em] text-brass">
@@ -284,6 +286,7 @@ export default async function ListingsPage({
             {TABS.map((t) => (
               <Link
                 key={t.id}
+                id={t.id === "pursuing" ? "pursuing-tab" : undefined}
                 href={tabHref(t.id)}
                 aria-current={filters.tab === t.id ? "page" : undefined}
                 className={`press inline-flex min-h-11 items-center px-3 text-xs uppercase tracking-[0.12em] sm:px-4 sm:tracking-[0.14em] ${
@@ -431,6 +434,7 @@ export default async function ListingsPage({
                 favorite={favoriteIds.has(l.id)}
                 hidden={hiddenIds.has(l.id)}
                 pursuit={marks.pursuits[l.id] ?? null}
+                fileAway={filters.tab !== "pursuing"}
                 mapPoint={mapPoints.get(l.id) ?? null}
               />
             ))}

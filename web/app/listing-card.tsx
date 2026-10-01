@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { ListingRow } from "@/lib/supabase";
 import { formatFull, formatMonthDay } from "@/lib/dates";
 import { sourceLabel as labelForSource } from "@/lib/sources";
@@ -9,6 +9,7 @@ import type { Pursuit } from "@/lib/marks";
 import { toggleFavorite, toggleHidden, updatePursuit } from "./actions";
 import { MapThumb, MapZoom } from "./map-thumb";
 import { ListingPreview } from "./listing-preview";
+import { Envelope } from "./pursuit-flight";
 
 export function ListingCard({
   listing,
@@ -17,6 +18,7 @@ export function ListingCard({
   favorite,
   hidden,
   pursuit,
+  fileAway,
   mapPoint,
 }: {
   listing: ListingRow;
@@ -25,10 +27,14 @@ export function ListingCard({
   favorite: boolean;
   hidden: boolean;
   pursuit: Pursuit | null;
+  fileAway: boolean;
   mapPoint: MapPoint | null;
 }) {
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState<Pursuit | null>(pursuit);
+  const [folding, setFolding] = useState(false);
+  const [filed, setFiled] = useState(false);
+  const articleRef = useRef<HTMLElement>(null);
   const [imageFailed, setImageFailed] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [mapZoom, setMapZoom] = useState(mapPoint?.approximate ? 13 : 15);
@@ -37,6 +43,34 @@ export function ListingCard({
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     e.preventDefault();
     setPreviewing(true);
+  };
+  const fileListing = () => {
+    const next = draft ? null : { messagedAt: null, tourAt: null, tourWith: null };
+    if (next && fileAway && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setFolding(true);
+      window.setTimeout(() => {
+        const rect = articleRef.current?.getBoundingClientRect();
+        const tab = document.getElementById("pursuing-tab")?.getBoundingClientRect();
+        if (rect) {
+          window.dispatchEvent(
+            new CustomEvent("ll-file-listing", {
+              detail: {
+                from: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+                to: tab
+                  ? { left: tab.left, top: tab.top, width: tab.width, height: tab.height }
+                  : null,
+              },
+            }),
+          );
+        }
+        setFiled(true);
+        setDraft(next);
+        startTransition(() => updatePursuit(listing.id, next));
+      }, 460);
+      return;
+    }
+    setDraft(next);
+    startTransition(() => updatePursuit(listing.id, next));
   };
   const isNew = now - new Date(listing.first_seen_at).getTime() < 24 * 60 * 60 * 1000;
   const isGone = !listing.is_active;
@@ -56,14 +90,18 @@ export function ListingCard({
     listing.sqft != null ? `${listing.sqft.toLocaleString()} sqft` : null,
   ].filter(Boolean);
 
+  if (filed) return null;
+
   return (
     <article
+      ref={articleRef}
       className={`rise group relative z-0 flex flex-col bg-bg-elevated transition-[transform,box-shadow] duration-300 ease-out-soft hover:z-10 hover:-translate-y-1 hover:shadow-lift ${
         isGone ? "opacity-70 hover:opacity-100" : ""
-      }`}
+      } ${folding ? "pointer-events-none" : ""}`}
       style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
     >
       <Corners />
+      <div className={folding ? "mail-suck" : undefined}>
       <div className="relative">
       <a
         href={listing.url}
@@ -223,15 +261,9 @@ export function ListingCard({
           </button>
           <button
             suppressHydrationWarning
-            disabled={pending}
+            disabled={pending || folding}
             aria-pressed={draft != null}
-            onClick={() => {
-              const next = draft
-                ? null
-                : { messagedAt: null, tourAt: null, tourWith: null };
-              setDraft(next);
-              startTransition(() => updatePursuit(listing.id, next));
-            }}
+            onClick={fileListing}
             className={`press inline-flex min-h-11 items-center border px-4 text-[11px] uppercase tracking-[0.16em] disabled:opacity-50 ${
               draft
                 ? "border-ink bg-metal text-ink"
@@ -242,6 +274,12 @@ export function ListingCard({
           </button>
         </div>
       </div>
+      </div>
+      {folding && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+          <Envelope className="envelope-in" />
+        </div>
+      )}
       {previewing && (
         <ListingPreview
           listing={listing}
