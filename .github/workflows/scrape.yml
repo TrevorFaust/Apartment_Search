@@ -8,7 +8,8 @@ on:
 
 jobs:
   scrape:
-    runs-on: ubuntu-latest
+    # ubuntu-latest is Ubuntu 26.04. Playwright cannot install Chromium there yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
