@@ -22,6 +22,7 @@ import {
   loadOutlierKeys,
   loadPreferences,
   loadSubscriberLocations,
+  pruneInactiveListings,
   recordRun,
   storeListings,
 } from "./supabase.js";
@@ -169,6 +170,8 @@ async function scrapeLocation(
 
 
 async function main() {
+
+  await pruneInactiveListings();
 
   const prefs = await loadPreferences();
 

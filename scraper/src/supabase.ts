@@ -246,6 +246,48 @@ export async function loadOutlierKeys(since: string): Promise<Set<string>> {
   return new Set((data ?? []).map((r) => `${r.source}:${r.external_id}`));
 }
 
+const INACTIVE_LISTING_KEEP_DAYS = 45;
+
+/** Drop listings that left the board and were not saved or pursued. */
+export async function pruneInactiveListings(keepDays = INACTIVE_LISTING_KEEP_DAYS): Promise<number> {
+  const cutoff = new Date(Date.now() - keepDays * 86400000).toISOString();
+  let removed = 0;
+
+  for (let page = 0; page < 40; page++) {
+    const { data, error } = await supabase
+      .from("listings")
+      .select("id")
+      .eq("is_active", false)
+      .lt("last_seen_at", cutoff)
+      .order("id", { ascending: true })
+      .limit(200);
+    if (error) throw new Error(`Load inactive listings failed: ${error.message}`);
+    const ids = (data ?? []).map((row) => row.id as string);
+    if (!ids.length) break;
+
+    const { data: marks, error: markErr } = await supabase
+      .from("listing_marks")
+      .select("listing_id, favorite, pursuing")
+      .in("listing_id", ids);
+    if (markErr) throw new Error(`Load listing marks failed: ${markErr.message}`);
+    const keep = new Set(
+      (marks ?? [])
+        .filter((mark) => mark.favorite || mark.pursuing)
+        .map((mark) => mark.listing_id as string),
+    );
+    const drop = ids.filter((id) => !keep.has(id));
+    if (drop.length) {
+      const { error: delErr } = await supabase.from("listings").delete().in("id", drop);
+      if (delErr) throw new Error(`Delete inactive listings failed: ${delErr.message}`);
+      removed += drop.length;
+    }
+    if (ids.length < 200 || drop.length === 0) break;
+  }
+
+  if (removed) console.log(`Deleted ${removed} inactive listings outside the retention window`);
+  return removed;
+}
+
 export async function recordRun(run: {
   startedAt: string;
   sourceCounts: Record<string, number>;
